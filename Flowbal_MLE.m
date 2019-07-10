@@ -1,10 +1,13 @@
 tic
 %% TO-DO
-
-% Look into changing intial conditions for each stream to possibly quicken
-% ODE solving time
-% Dynamic influent slowing down ODE by A LOT -> 80X
 % Convert ASM values to ADM
+    % Essentially done
+    % Need to verify and find missing variables
+    
+% Implement ODE/system equations for ADM1
+% Implement thickener(before AD)/dewatering(after AD)/dryer(after AD)
+% Implement denitrification filter
+
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
@@ -15,7 +18,7 @@ clc
 
 %% Simple simulation of MLE system with no digester.
 
-%% Solver for liquid flow balance of MLE system
+%% Recycle ratios for MLE system
 Rir = 2.5; % Specify internal recycle
 Rr = 0.95; % Specify Waste recycle (has to be less than 1)
 if Rr > 1
@@ -54,242 +57,162 @@ param = [0.67 0.24 0.08 0.08 ...
 %% simulation time span (days)
 t = 1:29;
 
-%% Intial conditions coming into plant
-% Units g/m3 = mg/L
-% Intial values
-TSS = 82; % mg/L
-VSS = 61.5; % mg/L
-FSS = TSS - VSS; % fixed suspended solids
-BOD5 = 155; % mg/L
-CODtotal = 325; % mg/L
-TKN = 43.5; % mg-N/L
-NH3 = 25; % mg-N/L
-NO3 = 0; % mg-N/L
-ALK = 200; % mg-N/L
-% Conversion to ASM1 Variables
-CODt = 2.1*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
-CODbo = 1.71*BOD5; % mgCOD/L, biodegradable COD
-CODio = CODt - CODbo; % mgCOD/L, inert COD
-Xio = 0.375*1.5*VSS; % mgCOD/L, particulate inert COD
-Sio = CODio - Xio; % mgCOD/L, soluble inert COD
-f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
-Sso = CODbo*f_readily; % mgCOD/L, readily biodegradable substrate
-Xso = CODbo - Sso; % mgCOD/L, slowly biodegradable substrate
-ONtotal = TKN - NH3; % mg-N/L, total organic nitrogen
-Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
-in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
-Xnio = in_xd*Xio; % mg-N/L, 
-Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
-Sndo = Snso_Xnso*(Sso/(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
-Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
-Xbho = 0.000000001; %0; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
-Xbao = 0.000000001; %0; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
-Soo = 0; % mgO2/L, oxygen concentration
-Xpo = 0; % mgCOD/L, biomass debris 
-Salko = ALK/100; % mM/L, alkalinity
-Snho = NH3; % Initial ammonia
-Snoo = 0; % Initial nitrite/nitrate
-
-%% alt method (poopyLab github)
+%% Convert typical units coming into plant to ASM1 variables
+% % Units g/m3 = mg/L
+% TSS = 82; % mg/L
+% VSS = 61.5; % mg/L
+% FSS = TSS - VSS; % fixed suspended solids
+% BOD5 = 155; % mg/L
+% CODtotal = 325; % mg/L
+% TKN = 43.5; % mg-N/L
+% NH3 = 25; % mg-N/L
+% NO3 = 0; % mg-N/L
+% ALK = 200; % mg-N/L
+% % Conversion to ASM1 Variables
+% CODt = 2.1*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
+% CODbo = 1.71*BOD5; % mgCOD/L, biodegradable COD
+% CODio = CODt - CODbo; % mgCOD/L, inert COD
+% Xio = 0.375*1.5*VSS; % mgCOD/L, particulate inert COD
+% Sio = CODio - Xio; % mgCOD/L, soluble inert COD
+% f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
+% Sso = CODbo*f_readily; % mgCOD/L, readily biodegradable substrate
+% Xso = CODbo - Sso; % mgCOD/L, slowly biodegradable substrate
+% ONtotal = TKN - NH3; % mg-N/L, total organic nitrogen
+% Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
+% in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
+% Xnio = in_xd*Xio; % mg-N/L, 
+% Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
+% Sndo = Snso_Xnso*(Sso/(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
+% Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
+% Xbho = 0.000000001; %0; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
+% Xbao = 0.000000001; %0; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
+% Soo = 0; % mgO2/L, oxygen concentration
+% Xpo = 0; % mgCOD/L, biomass debris 
+% Salko = ALK/100; % mM/L, alkalinity
+% Snho = NH3; % Initial ammonia
+% Snoo = 0; % Initial nitrite/nitrate
+% alt method (poopyLab github)
 %nb_TKN = TKN*0.03;
 %sol_bio_orgN_ratio = Sso/(Sso+ Xso);
 %inf_S_NS = (TKN - Snho - nb_TKN)*(sol_bio_orgN_ratio);
 %inf_X_NS = (TKN - Snho - nb_TKN)*(1 - sol_bio_orgN_ratio);
 
-%% Intial conditions for function
+%% Intial conditions for system
 % assume the initial conditions into plant are those of the reactors
-
-Sio  = 30; %Soluble inert organic matter
-Sso  = 69.5; %Readily biodegradable substrate
-Xio  = 51.2; %Particulate inert organic matter
-Xso  = 202.32; %Slowly biodegradable substrate
-Xbho = 28.17; %Active heterotrophic biomass
-Xbao = 25; %Active autotrophic biomass
-Xpo  = 0; %Particulate products arising from biomass decay
-Soo  = 0; %Oxygen
-Snoo = 0; %Nitrate and nitrite nitrogen
-Snho = 5; %NH 4+ + NH 3 nitrogen
-Sndo = 6.95; %Soluble biodegradable organic nitrogen
-Xndo = 5; %Particulate biodegradable organic nitrogen
-Salko = 7; %Alkalinity
+% Since we arent dealing with startup, look to adjust initial conditions for each stream 
+Sio  = 30; % Soluble inert organic matter
+Sso  = 69.5; % Readily biodegradable substrate
+Xio  = 51.2; % Particulate inert organic matter
+Xso  = 202.32; % Slowly biodegradable substrate
+Xbho = 28.17; % Active heterotrophic biomass
+Xbao = 25; % Active autotrophic biomass
+Xpo  = 0; % Particulate products arising from biomass decay
+Soo  = 0; % Oxygen
+Snoo = 0; % Nitrate and nitrite nitrogen
+Snho = 5; % NH 4+ + NH 3 nitrogen
+Sndo = 6.95; % Soluble biodegradable organic nitrogen
+Xndo = 5; % Particulate biodegradable organic nitrogen
+Salko = 7; % Alkalinity
 x_int = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko]; % Create vector of initial values for the MLE system
-x = x_int(:)*ones(1,12); % Format to an array of [components,streams]
+x = x_int(:)*ones(1,12); % Format to an array of [components,streams] -> maybe send to ODE function to allow the initial conditions to be adjusted for added streams
 
 %% Import data for varying influent flow
-
 dat_dry=importdata('datos/Inf_dry_2006.txt','\t',1);
 dat_rain=importdata('datos/Inf_rain_2006.txt','\t',1);
 dat_strm=importdata('datos/Inf_strm_2006.txt','\t',1);
 % Append data
-aaa=dat_dry.data;
-aaa_=dat_strm.data;
-aaa_(:,1)=aaa_(:,1)+aaa(end,1);
-Qi=[aaa;aaa_];
-
-%% solve diff equation
-
-VarConc_out = zeros(13,12); % Intialize value for assignin
-RowTime_out = [];
-ColTime_out = [];
-StepTime_out = [];
-ismemberTime_out = [];
+drydata = dat_dry.data;
+stormdata = dat_strm.data;
+stormdata(:,1) = stormdata(:,1) + drydata(end,1);
+InfluentData = [drydata;stormdata];
+DataTime = InfluentData(:,1); % Time
+% Manipulate data for ODE input
+Qt = InfluentData(:,1); % Time, days
+Ct = Qt; % Time, days
+InfluentData(:,1) = []; % Remove column of time data
+Qflow = InfluentData(:,14); % Flow at time, Qt
+InfluentData(:,14) = []; % Remove column of influent flow data
+C = InfluentData; % Conc at time, Ct
+% Correct for duplicates in data by adding a small increment to each element
+k = 1;
+while k < (length(Qflow)+1)
+    if k == 1
+        Qt(k) = 1; % Set time to exactly 1 to avoid interpolation errors on initial points for Qflow and C in ODE
+        Ct(k) = 1;
+    else
+    Qt(k) = Qt(k) + (rand*rand)*1E-5 + 1; 
+    Ct(k) = Qt(k);
+    end
+Qflow(k) = Qflow(k) + (rand*rand)*1E-3;
+C(k,:) = C(k,:) + (rand*rand)*1E-7;
+k = k + 1;
+end
+  
+%% ODE
+% Intialize variables for assignin
+VarConc_out = zeros(13,12); 
 PlantInflow_out = [];
-T_out = 0; % Intialize value for assignin
-ODE_sol = ode15s(@(t,x) MLE(t,x,param,Qi,Rir,Rr,fpc,fsc),t,x);
+T_out = [];
+% Optimize ODE solver
+opts = odeset('MStateDependence','JPattern','Stats','on','OutputFcn',@odeplot);
+ODE_sol = ode15s(@(t,x) MLE(t,x,param,Rir,Rr,fpc,fsc,Qflow,Qt,Ct,C),t,x,opts);
 
-%% Import/Manipulate data
-%conc_time = importdata('dCdt_var.txt');% Pull the time values out%time = conc_time(14:14:end,1);% Delete every row with time in it%conc_time(14:14:end,:) = [];%Concentration = conc_time;
-
+%% Results
 % Get the data for each stream from the column of Concentration, then
 % manipulate each array to be used for graphing
 VarConc_out(1:13,:) = []; % Delete dummy rows
 Concentration = VarConc_out; 
-T_out(1) = []; % Delete dummy value
 time = T_out;
-% To comment out block of code -> select the code and type "Ctrl" + "R". 
-% To uncomment the selected text, click the "Uncomment" button or type "Ctrl" + "T"
-
-streamOne = reshape(Concentration(:,1),[13,length(time)])';
-streamTwo = reshape(Concentration(:,2),[13,length(time)])';
-streamThree = reshape(Concentration(:,3),[13,length(time)])';
-streamFour = reshape(Concentration(:,4),[13,length(time)])';
-streamFive = reshape(Concentration(:,5),[13,length(time)])';
-streamSix = reshape(Concentration(:,6),[13,length(time)])';
-streamSeven = reshape(Concentration(:,7),[13,length(time)])';
-streamEight = reshape(Concentration(:,8),[13,length(time)])';
-streamNine = reshape(Concentration(:,9),[13,length(time)])';
-streamTen = reshape(Concentration(:,10),[13,length(time)])';
-streamEleven = reshape(Concentration(:,11),[13,length(time)])';
-streamTwelve = reshape(Concentration(:,12),[13,length(time)])';
-subplot(4,4,1)
-plot(time,streamOne)
-title('Stream One')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,2)
-plot(time,streamTwo)
-title('Stream Two')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,3)
-plot(time,streamThree)
-title('Stream Three')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,4)
-plot(time,streamFour)
-title('Stream Four')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,5)
-plot(time,streamFive)
-title('Stream Five')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,6)
-plot(time,streamSix)
-title('Stream Six')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,7)
-plot(time,streamSeven)
-title('Stream Seven')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,8)
-plot(time,streamEight)
-title('Stream Eight')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,9)
-plot(time,streamNine)
-title('Stream Nine')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,10)
-plot(time,streamTen)
-title('Stream Ten')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,11)
-plot(time,streamEleven)
-title('Stream Eleven')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,12)
-plot(time,streamTwelve)
-title('Stream Twelve')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,13)
-plot(time,streamNine(:,10))
-title('Effluent Ammonia')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,14)
-plot(time,streamNine(:,9))
-title('Effluent Nitrate/Nitrite')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,4,15)
-plot(time,PlantInflow_out)
-title('Plant flow')
-ylabel('Volumetric Flow, m3/day')
-xlabel('Time, days')
+j = 1;
+stream = [];
+[row,col] = size(Concentration);
+% Plot results
+while j < (15+1)
+    if j < (col+1)
+    rev = num2str(j);
+    stream.rev = reshape(Concentration(:,j),[13,length(time)])';
+    subplot(4,4,j);
+    plot(time,stream.rev);
+    title(['Stream ' rev])
+    ylabel('Concentration, mg/L')
+    xlabel('Time, days')
+    else
+    end
+    if j == 13
+        subplot(4,4,j)
+        plot(time,stream.rev(:,10))
+        title('Effluent Ammonia')
+        ylabel('Concentration, mg/L')
+        xlabel('Time, days')
+    elseif j == 14
+        subplot(4,4,j)
+        plot(time,stream.rev(:,9))
+        title('Effluent Nitrate/Nitrite')
+        ylabel('Concentration, mg/L')
+        xlabel('Time, days')
+    elseif j == 15
+        subplot(4,4,j)
+        plot(time,PlantInflow_out)
+        title('Plant flow')
+        ylabel('Volumetric Flow, m3/day')
+        xlabel('Time, days')
+    else
+    end
+    j = j + 1;
+end
 
 toc
-function [Conc] = MLE(t,dCdt,param,Qi,Rir,Rr,fpc,fsc)
+function [Conc] = MLE(t,dCdt,param,Rir,Rr,fpc,fsc,Qflow,Qt,Ct,C)
 % Fixes structure of intial values from vector to an array
 dCdt = reshape(dCdt,[13,12]);
 %% Dynamic flow
-format long g
-t_val = Qi(:,1);
-t_val = round(t_val*1000)/1000;
-t_step = t;
-t_step = round(t_step*1000)/1000;
-%assignin('base','DynamicTime',t_val);
-%[row,~] = find(t_val == (t_step-1));
-tol = 0.0052;
-[row,~] = find(abs(t_val - (t_step-1))<tol);
-
-% ** Rather than choose one randomly, implement interpolation between
-% the points -> this will also help with data points that are missing
-% due to floating point errors, so you can possibly increase the
-% tolerance and use interpolation between all values.**
-
-% If the number of elements in row is greater than one, just use first
-% element
-if numel(row) > 1
-    row = row(1);
-else
-end
-%assignin('base','RowTime',row);
-%evalin('base','RowTime_out = [RowTime_out;RowTime];');
-%assignin('base','ColTime',col);
-%evalin('base','ColTime_out = [ColTime_out;ColTime];');
-%assignin('base','StepTime',(t_step)-1);
-%evalin('base','StepTime_out = [StepTime_out;StepTime];');
-%Same_val = ismember(t_val,(1-t_step),'rows');
-%Same_val = ismembertol(t_val,(1-t_step),0.001);
-%Display = find(Same_val == 1);
-%assignin('base','ismemberTime',Same_val);
-%evalin('base','ismemberTime_out = [ismemberTime_out;ismemberTime];');
-Qi(:,1) = [];
-Q_val = Qi(:,14);
-Qi(:,14) = [];
-Dyn_conc = Qi;
-%Influent_conc = Dyn_conc(row,:);
-Qplant = Q_val(row);
-%Interp_Dyn_conc = interp1(Dyn_conc,
-assignin('base','Dynamic_Conc',Dyn_conc);
+Qplant = interp1(Qt,Qflow,t); % Interpolate data set of volumetric flow at specified time
 %% Flow solver
 opts = optimoptions(@fsolve,'Algorithm', 'levenberg-marquardt');
-Qint = [100000 99000 1000 300000 300000 300000 200000 250000 100000 50000 50000 300000];
+Qint = [20000 19000 100 60000 60000 60000 25000 17000 10000 10000 500 10000];
 [Q,~] = fsolve(@(Q) myfunc(Q,Qplant,Rir,Rr,fpc,fsc),Qint,opts);
 assignin('base','PlantInflow',Q);
 evalin('base','PlantInflow_out = [PlantInflow_out;PlantInflow];');
-%flows = {'Qpi','Qpo','Qpu','Qi','Qm','Qio','Qo','Qir','Qe','Qu','Qw','Qr'};
-%table(Q','RowNames',flows)
 function Qsolve = myfunc(Q,Qplant,Rir,Rr,fpc,fsc)
 %% Solves flow balance for given plant flow, recycle/waste fractions, and clarifier splits
 Qsolve = [Qplant - Q(1);
@@ -331,16 +254,18 @@ kh = param(17); % 1/day
 Kx = param(18); 
 nh = param(19);
 
-%O2 transference
+% O2 transference
 KLa = param(20); % Oxygen transfer coefficient
 So_sat = param(21); % gO2/m3
+
+% Equipment volumes
 Vol1 = param(22); % primary clarifier m3
 Vol2 = param(23); % anoxic m3
 Vol3 = param(24); % aeration m3
 Vol4 = param(25); % secondary clarifier m3
 %Vol5 = param(26); % denit filters m3
 
-%% State vector
+%% Component Identification
 %Si  = dCdt(1,i); % Soluble inert organic matter
 %Ss  = dCdt(2,i); % Readily biodegradable substrate
 %Xi  = dCdt(3,i); % Particulate inert organic matter
@@ -388,41 +313,41 @@ theta2 = [muh*(dCdt(2,6)/(Ks+dCdt(2,6)))*(dCdt(8,6)/(Koh+dCdt(8,6)))*dCdt(5,6);.
     kh*dCdt(4,6)/dCdt(5,6)/(Kx+dCdt(4,6)/dCdt(5,6))*((dCdt(8,6)/(Koh+dCdt(8,6)))+nh*Koh/(Koh+dCdt(8,6))*dCdt(9,6)/(Kno+dCdt(9,6)))*dCdt(5,6)*dCdt(12,6)/dCdt(4,6)];
 
 %% MLE mass balance
-%Q(1) - Q(3) - Q(2); % primary clarifier
-%Q(2) + Q(8) + Q(12) - Q(4); % inflow to anox 
-%Q(5) - Q(4); % anox reactor
-%Q(6) - Q(5); % aeration reactor
-%Q(7) + Q(8) - Q(6); % recycle split
-%Q(9) + Q(10) - Q(7); % secondary clarifier
-%Q(12) + Q(11) - Q(10); % RAS/WAS split
+% Q(1) - Q(3) - Q(2); % primary clarifier
+% Q(2) + Q(8) + Q(12) - Q(4); % inflow to anox 
+% Q(5) - Q(4); % anox reactor
+% Q(6) - Q(5); % aeration reactor
+% Q(7) + Q(8) - Q(6); % recycle split
+% Q(9) + Q(10) - Q(7); % secondary clarifier
+% Q(12) + Q(11) - Q(10); % RAS/WAS split
 
 %% ODE for MLE system
 % Concentration of component i in stream 1-12
 % K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8) 
 i = 1;
-Conc = zeros(13,12);
+Conc = zeros(length(dCdt),numel(Q));
 while i < (length(dCdt)+1)
-    % Model is under performing compared to simulation results from B&V
+    % Model won't be used for my plant simulation
     %% Modeling primary clarifier - Otterpohl and Freund 1992
-    %hrt = Vol1/Q(1); % Hydraulic residence time
-    %n_COD = 2.7*log(hrt*hrt + 9)/100; % Removal efficiency
-    XCOD1 = dCdt(3,1) + dCdt(4,1) + dCdt(5,1) + dCdt(6,1) + dCdt(7,1); % Particulate COD in influent
-    %CODin = dCdt(1,1) + dCdt(2,1) + XCODin; % Total COD in influent
-    %n_x = (n_COD*CODin)/XCODin;
-    %if n_x > 0.95
-    %    n_x = 0.95;
-    %elseif n_x < 0.05
-    %    n_x = 0.05;
-    %else
-    %    n_x = n_x;
-    %end
+%     hrt = Vol1/Q(1); % Hydraulic residence time
+%     n_COD = 2.7*log(hrt*hrt + 9)/100; % Removal efficiency
+      XCOD1 = dCdt(3,1) + dCdt(4,1) + dCdt(5,1) + dCdt(6,1) + dCdt(7,1); % Particulate COD in influent
+%     CODin = dCdt(1,1) + dCdt(2,1) + XCOD1; % Total COD in influent
+%     n_x = (n_COD*CODin)/XCOD1;
+%     if n_x > 0.95
+%        n_x = 0.95;
+%     elseif n_x < 0.05
+%        n_x = 0.05;
+%     else
+%        n_x = n_x;
+%     end
+%     n_x = (1-n_x);
     %% TSS removal
-    n_x = 0.533; % Fraction of TSS left in waste effluent, taken as average from ST and NT from Appendix B GPS-X files from B&V
-    % Mass of TSS in influent
-    massTSS_inf = XCOD1*Q(1);
+    n_x = 0.533; % Fraction of TSS left in effluent, taken as average from ST and NT from Appendix B GPS-X files from B&V
     % Determine which components are separated
-
-    dCdt(i,1) = Dyn_conc(row,i);
+    Dyn_conc = interp1(Ct,C,t); % Interpolate data set of concentration at specified time
+    dCdt(i,1) = Dyn_conc(:,i);
+    
     if i < 3
         dCdt(i,2) = dCdt(i,1);
     elseif (2<i) && (i<8)
@@ -445,7 +370,7 @@ while i < (length(dCdt)+1)
     else
         dCdt(i,3) = dCdt(i,1);
     end
-    dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); % Mass balance for flow Into/Out of Primary Clarifier
+    dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); % Mass balance for flow into/out of Primary Clarifier
 
     %% Recycle split, same concentration
     mass = zeros(13,12);
@@ -460,9 +385,8 @@ while i < (length(dCdt)+1)
     % Model not worth implementing, values taken from B&V will be used from
     % App. B from GPS-X pdf file
     %% Secondary clarifier model
-    c_x = 0.0015; % Mass fraction of TSS left in waste effluent, taken as average from ST and NT of B&V App. B file
+    c_x = 0.0015; % Fraction of TSS left in effluent, taken as average from ST and NT of B&V App. B file
     XCOD7 = dCdt(3,7) + dCdt(4,7) + dCdt(5,7) + dCdt(6,7) + dCdt(7,7); % Particulate COD in influent
-    massTSS_7 = XCOD7*Q(7); % Mass of TSS in influent
     if i < 3
         dCdt(i,9) = dCdt(i,7);
     elseif (2<i) && (i<8)
@@ -487,8 +411,8 @@ while i < (length(dCdt)+1)
     end
     
     dCdt(i,7) = (dCdt(i,9)*Q(9) + dCdt(i,10)*Q(10))/Q(7); % Mass balance for flow Into/Out of Primary Clarifier
-    XCOD9 = dCdt(3,9) + dCdt(4,9) + dCdt(5,9) + dCdt(6,9) + dCdt(7,9); % Particulate COD in influent
-    XCOD10 = dCdt(3,10) + dCdt(4,10) + dCdt(5,10) + dCdt(6,10) + dCdt(7,10); % Particulate COD in influent
+    XCOD9 = dCdt(3,9) + dCdt(4,9) + dCdt(5,9) + dCdt(6,9) + dCdt(7,9); % Particulate COD in effluent
+    XCOD10 = dCdt(3,10) + dCdt(4,10) + dCdt(5,10) + dCdt(6,10) + dCdt(7,10); % Particulate COD in waste stream
     
     %% Waste split
     mass(i,10) = Q(10)*dCdt(i,10);
@@ -503,22 +427,163 @@ while i < (length(dCdt)+1)
 
     Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
     if i == 8
-        Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aireation on the Oxygen concentration
+        Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
     else 
         Conc(i,6) = Conc(i,6);
     end
     COD = [XCOD1,XCOD7,XCOD9,XCOD10];
-    %disp(COD)
+    %% Conversion from ASM1 to ADM1
+    % Not executable yet
+    % Add new streams into Q and initial conditions
+    % COD demand
+    dCdt(i,13) = (dCdt(i,12)*Q(12) + dCdt(i,3)*Q(3))/Q(13);
+    CODdemand = dCdt(8,13) + 2.86*dCdt(9,13);
+    % Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
+    if CODdemand < (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
+        disp('Warning! Influent characterization may need to be evaluated, not enough COD available')
+    else
+    end
+    if CODdemand > dCdt(2,13)
+    CODdemand = CODdemand - dCdt(2,13);
+    dCdt(2,13) = -CODdemand;
+        if dCdt(2,13) < 0
+            dCdt(2,13) = 0;
+        else
+        end
+    elseif CODdemand < dCdt(2,13)
+        dCdt(2,13) = dCdt(2,13) - CODdemand;
+        CODdemand = - dCdt(2,13);
+        if CODdemand < 0
+            CODdemand = 0;
+        else
+        end
+    elseif CODdemand == dCdt(2,13)
+        dCdt(2,13) = dCdt(2,13) - CODdemand;
+        CODdemand = - dCdt(2,13);
+    end
+    if CODdemand > dCdt(4,13)
+        CODdemand = CODdemand - dCdt(4,13);
+        dCdt(4,13) = -CODdemand;
+            if dCdt(4,13) < 0
+                dCdt(4,13) = 0;
+            else
+            end
+    elseif CODdemand < dCdt(4,13)
+        dCdt(4,13) = dCdt(4,13) - CODdemand;
+        CODdemand = - dCdt(4,13);
+        if CODdemand < 0
+            CODdemand = 0;
+        else
+        end
+    elseif CODdemand == dCdt(4,13)
+        dCdt(4,13) = dCdt(4,13) - CODdemand;
+        CODdemand = - dCdt(4,13);
+    end
+    if CODdemand > dCdt(5,13)
+    CODdemand = CODdemand - dCdt(5,13);
+    dCdt(5,13) = -CODdemand;
+        if dCdt(5,13) < 0
+            dCdt(5,13) = 0;
+        else
+        end
+    elseif CODdemand < dCdt(5,13)
+        dCdt(5,13) = dCdt(5,13) - CODdemand;
+        CODdemand = - dCdt(5,13);
+        if CODdemand < 0
+            CODdemand = 0;
+        else
+        end
+    elseif CODdemand == dCdt(5,13)
+        dCdt(5,13) = dCdt(5,13) - CODdemand;
+        CODdemand = - dCdt(5,13);
+    end
+    if CODdemand > dCdt(6,13)
+    CODdemand = CODdemand - dCdt(6,13);
+    dCdt(6,13) = -CODdemand;
+        if dCdt(6,13) < 0
+            dCdt(6,13) = 0;
+        else
+        end
+    elseif CODdemand < dCdt(6,13)
+        dCdt(6,13) = dCdt(6,13) - CODdemand;
+        CODdemand = - dCdt(6,13);
+        if CODdemand < 0
+            CODdemand = 0;
+        else
+        end
+    elseif CODdemand == dCdt(6,13)
+        dCdt(6,13) = dCdt(6,13) - CODdemand;
+        CODdemand = - dCdt(6,13);
+    end
+    % Soluble Organic Nitrogen
+    ReqCODs = dCdt(11,13)/Naa; % Naa is nitrogen fraction of the amino acid state variable, Saa
+    if dCdt(2,13) > ReqCODs
+        Saa = ReqCODs;
+        Ssu_A = dCdt(2,13) - ReqCODs;
+    else
+        Saa = dCdt(2,13);
+        Ssu_A = 0;
+    end
+    % Soluble Inert Organic Material
+    CODin = dCdt(1,13) + dCdt(2,13) + dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13);
+    CODremain = CODin - dCdt(2,13);
+    OrgN = dCdt(11,13) + dCdt(12,13)- dCdt(10,13);
+    OrgNremain = OrgN - Saa*Naa;
+    ReqOrgNs = Ni*dCdt(1,13);
+    if OrgNremain > ReqOrgNs
+        Si_ADM = dCdt(1,13);
+        Ssu = Ssu_A;
+    else
+        Si_ADM = OrgNremain/Ni;
+        Ssu = Ssu_A + dCdt(1,13) - Si_ADM;
+    end
+    CODremain = CODremain - dCdt(1,13);
+    OrgNremain = OrgNremain - Si_ADM*Ni;
+    % Particulate Inert  COD mapping
+    ReqOrgNx = fxi*(dCdt(3,13) + dCdt(7,13))*Ni;
+    if OrgNremain > ReqOrgNx
+        Xi_ADM = fxi*(dCdt(3,13) + dCdt(7,13));
+    else
+        Xi_ADM = OrgNremain/Ni;
+    end
+    CODremain = CODremain - Xi_ADM;
+    OrgNremain = OrgNremain - Xi_ADM*Ni;
+    % Partitioning of Remaining COD and TKN
+    ReqCODXc = OrgNremain/Nxc;
+    if CODremain > ReqCODXc
+        Xc = ReqCODXc;
+        Xch = (fch_xc/(fch_xc + fli_xc))*(CODremain - Xc);
+        Xli = (fli_xc/(fch_xc + fli_xc))*(CODremain - Xc);
+        Sin = dCdt(10,13);
+    else
+        Xc = CODremain;
+        Xch = 0;
+        Xli = 0;
+        Sin = dCdt(10,13) + OrgNremain - Xc*Nxc;
+    end
+    % CODremain and TNKremain should be zero.
+    Scat = dCdt(13,13) + 0.035;
+    San = Sin;
+         
+    %% Conversion from ADM1 to ASM1
+    CODconserved = CODt_anaerobic - Sh2 - Sch4;
+    % COD Conversions
+    dCdt(1,effluent) = Si_ADM;
+    dCdt(3,eff) = Xi_ADM;
+    dCdt(2,eff) = Ssu + Saa + Sfa + Sva + Sbu + Spro + Sac;
+    dCdt(4,eff) = Xc + Xch + Xpr + Xli + Xsu + Xaa + Xfa + Xc4 + Xpro + Xac + Xh2;
+    % TKN Conversions
+    dCdt(10,eff) = Sin;
+    dCdt(11,eff) = Si_ADM*Ni + Saa*Naa;
+    dCdt(12,eff) = Nbac*(Xsu + Xaa + Xfa + Xc4 + Xpro + Xac + Xh2) + Ni*Xi + Nxc*Xc + Naa*Xpr - ixe*Xi;
+    dCdt(5,eff) = 0;
+    dCdt(6,eff) = 0;
+    dCdt(7,eff) = 0;
+    dCdt(13,eff) = Sic; 
     i = i + 1;
 end
 vec_len = numel(Conc);
 Conc = reshape(Conc,[vec_len,1]);
-% Save dCdt to file
-%if t == 1
-%    save('dCdt_var.txt','dCdt','t','-ascii')
-%else 
-%    save('dCdt_var.txt','dCdt','t','-ascii','-append')
-%end
 % Due to Conc only changing in the reactors, dCdt variable needs to be
 % saved and sent to the workspace.
 fprintf('Current simulation time is %6.2f days\n',t)
