@@ -1,13 +1,16 @@
 tic
 %% TO-DO
 % Convert ASM values to ADM
+    % UNITS NEED TO BE ADJUSTED
     % Essentially done
     % Need to verify and find missing variables
     
 % Implement ODE/system equations for ADM1
+    % d_1_code,IndataADM1_v2,ADM1_fun_v2_ODE
 % Implement thickener(before AD)/dewatering(after AD)/dryer(after AD)
 % Implement denitrification filter
 
+% Create PID for oxygen transfer in aeration zone
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
@@ -19,22 +22,16 @@ clc
 %% Simple simulation of MLE system with no digester.
 
 %% Recycle ratios for MLE system
-Rir = 2.5; % Specify internal recycle
-Rr = 0.95; % Specify Waste recycle (has to be less than 1)
-if Rr > 1
-    Rr = 1;
-elseif Rr < 0
-    Rr = 0;
-else 
-end
-fpc = 0.01; % Primary Clarifier flow separation
+Rir = 1.88; % Specify internal recycle ratio MLR/PC_effluent 
+Rr = 0.71; % Specify return activated sludge recycle ratio RAS/PC_effluent 
+fpc = 0.017554; % Primary Clarifier flow separation (has to be less than or equal to 1)
 if fpc > 1
     fpc = 1;
 elseif fpc < 0
     fpc = 0;
 else
 end
-fsc = 0.389; % Secondary Clarifier flow separation
+fsc = 0.974; % Secondary Clarifier underflow separation (has to be less than or equal to 1)
 if fsc > 1
     fsc = 1;
 elseif fsc < 0
@@ -55,12 +52,18 @@ param = [0.67 0.24 0.08 0.08 ...
 4803.84]';
 
 %% simulation time span (days)
-t = 1:29;
-
+t = 1:0.1:29;
+% Sample rate
+    % Decrease sample rate more better DO control, but ODE takes longer
+sp = 1/5;
+tsample = t + sp*t;
 %% Convert typical units coming into plant to ASM1 variables
 % % Units g/m3 = mg/L
 % TSS = 82; % mg/L
 % VSS = 61.5; % mg/L
+% If no VSS data, assume TSS/VSS ratio of 0.69 or 0.75
+% tv = 0.69;
+% VSS = TSS/tv;
 % FSS = TSS - VSS; % fixed suspended solids
 % BOD5 = 155; % mg/L
 % CODtotal = 325; % mg/L
@@ -153,9 +156,11 @@ end
 VarConc_out = zeros(13,12); 
 PlantInflow_out = [];
 T_out = [];
+MCRT_out = [];
 % Optimize ODE solver
+figure(1)
 opts = odeset('MStateDependence','JPattern','Stats','on','OutputFcn',@odeplot);
-ODE_sol = ode15s(@(t,x) MLE(t,x,param,Rir,Rr,fpc,fsc,Qflow,Qt,Ct,C),t,x,opts);
+ODE_sol = ode15s(@(t,x) MLE(t,x,param,Rir,Rr,fpc,fsc,Qflow,Qt,Ct,C,tsample),t,x,opts);
 
 %% Results
 % Get the data for each stream from the column of Concentration, then
@@ -166,8 +171,9 @@ time = T_out;
 j = 1;
 stream = [];
 [row,col] = size(Concentration);
+figure(2)
 % Plot results
-while j < (15+1)
+while j < (16+1)
     if j < (col+1)
     rev = num2str(j);
     stream.rev = reshape(Concentration(:,j),[13,length(time)])';
@@ -178,14 +184,19 @@ while j < (15+1)
     xlabel('Time, days')
     else
     end
-    if j == 13
-        subplot(4,4,j)
+    if j == 6
+        subplot(4,4,16)
+        plot(time,stream.rev(:,8))
+        title('DO')
+        ylabel('Concentration, mg/L')
+        xlabel('Time, days')
+    elseif j == 9
+        subplot(4,4,13)
         plot(time,stream.rev(:,10))
         title('Effluent Ammonia')
         ylabel('Concentration, mg/L')
         xlabel('Time, days')
-    elseif j == 14
-        subplot(4,4,j)
+        subplot(4,4,14)
         plot(time,stream.rev(:,9))
         title('Effluent Nitrate/Nitrite')
         ylabel('Concentration, mg/L')
@@ -196,13 +207,14 @@ while j < (15+1)
         title('Plant flow')
         ylabel('Volumetric Flow, m3/day')
         xlabel('Time, days')
+
     else
     end
     j = j + 1;
 end
 
 toc
-function [Conc] = MLE(t,dCdt,param,Rir,Rr,fpc,fsc,Qflow,Qt,Ct,C)
+function [Conc] = MLE(t,dCdt,param,Rir,Rr,fpc,fsc,Qflow,Qt,Ct,C,tsample)
 % Fixes structure of intial values from vector to an array
 dCdt = reshape(dCdt,[13,12]);
 %% Dynamic flow
@@ -215,12 +227,24 @@ assignin('base','PlantInflow',Q);
 evalin('base','PlantInflow_out = [PlantInflow_out;PlantInflow];');
 function Qsolve = myfunc(Q,Qplant,Rir,Rr,fpc,fsc)
 %% Solves flow balance for given plant flow, recycle/waste fractions, and clarifier splits
+% Q(1) = Plant influent
+% Q(2) = Primary clarifier effluent
+% Q(3) = Primary clarifier waste sludge
+% Q(4) = Anoxic influent
+% Q(5) = Anoxic effluent
+% Q(6) = Aeration Effluent
+% Q(7) = Secondary clarifier influent
+% Q(8) = Internal recycle (MLR)
+% Q(9) = Secondary clarifier effluent
+% Q(10) = Secondary clarifier underflow
+% Q(11) = WAS
+% Q(12) = RAS
 Qsolve = [Qplant - Q(1);
 Q(1) - Q(3) - Q(2);
 Rir*Q(2) - Q(8);
-Rr*Q(10) - Q(12);
+Rr*Q(2) - Q(12);
 fpc*Q(1) - Q(3);
-fsc*Q(7) - Q(10);
+fsc*Q(10) - Q(12);
 Q(2) + Q(8) + Q(12) - Q(4);
 Q(5) - Q(4);
 Q(6) - Q(5);
@@ -424,162 +448,180 @@ while i < (length(dCdt)+1)
     dCdt(i,4) = (Q(2)*dCdt(i,2) + Q(8)*dCdt(i,8) + Q(12)*dCdt(i,12))/Q(4); % mixing point
     
     Conc(i,5) = 1/Vol2*(Q(4)*dCdt(i,4) - Q(5)*dCdt(i,5)) + K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8); % Anoxic balance
-
     Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
     if i == 8
+%         % Rough control of DO in aeration zone
+%         tadj = round(t*100)/100;
+%         t_find = find(tadj == tsample);
+%         dCdt(10,6);
+%         dCdt(8,6);
+%         if numel(t_find) > 0
+%             if dCdt(10,6) > 5
+%                 KLa = param(20);
+%             else
+%                 KLa = 0;
+%             end
+%         else
+%         end
         Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
     else 
         Conc(i,6) = Conc(i,6);
     end
-    COD = [XCOD1,XCOD7,XCOD9,XCOD10];
+    % Calculate MCRT
+%     XCOD6 = dCdt(3,6) + dCdt(4,6) + dCdt(5,6) + dCdt(6,6) + dCdt(7,6); % Particulate COD in MLSS
+%     XCOD11 = dCdt(3,11) + dCdt(4,11) + dCdt(5,11) + dCdt(6,11) + dCdt(7,11); % Particulate COD in WAS
+%     MCRT = (XCOD6*Vol3)/(XCOD11*Q(11))
+%     assignin('base','MCRT_step',MCRT);
+%     evalin('base','MCRT_out(end+1) = MCRT_step;');
     %% Conversion from ASM1 to ADM1
     % Not executable yet
     % Add new streams into Q and initial conditions
     % COD demand
-    dCdt(i,13) = (dCdt(i,12)*Q(12) + dCdt(i,3)*Q(3))/Q(13);
-    CODdemand = dCdt(8,13) + 2.86*dCdt(9,13);
-    % Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
-    if CODdemand < (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
-        disp('Warning! Influent characterization may need to be evaluated, not enough COD available')
-    else
-    end
-    if CODdemand > dCdt(2,13)
-    CODdemand = CODdemand - dCdt(2,13);
-    dCdt(2,13) = -CODdemand;
-        if dCdt(2,13) < 0
-            dCdt(2,13) = 0;
-        else
-        end
-    elseif CODdemand < dCdt(2,13)
-        dCdt(2,13) = dCdt(2,13) - CODdemand;
-        CODdemand = - dCdt(2,13);
-        if CODdemand < 0
-            CODdemand = 0;
-        else
-        end
-    elseif CODdemand == dCdt(2,13)
-        dCdt(2,13) = dCdt(2,13) - CODdemand;
-        CODdemand = - dCdt(2,13);
-    end
-    if CODdemand > dCdt(4,13)
-        CODdemand = CODdemand - dCdt(4,13);
-        dCdt(4,13) = -CODdemand;
-            if dCdt(4,13) < 0
-                dCdt(4,13) = 0;
-            else
-            end
-    elseif CODdemand < dCdt(4,13)
-        dCdt(4,13) = dCdt(4,13) - CODdemand;
-        CODdemand = - dCdt(4,13);
-        if CODdemand < 0
-            CODdemand = 0;
-        else
-        end
-    elseif CODdemand == dCdt(4,13)
-        dCdt(4,13) = dCdt(4,13) - CODdemand;
-        CODdemand = - dCdt(4,13);
-    end
-    if CODdemand > dCdt(5,13)
-    CODdemand = CODdemand - dCdt(5,13);
-    dCdt(5,13) = -CODdemand;
-        if dCdt(5,13) < 0
-            dCdt(5,13) = 0;
-        else
-        end
-    elseif CODdemand < dCdt(5,13)
-        dCdt(5,13) = dCdt(5,13) - CODdemand;
-        CODdemand = - dCdt(5,13);
-        if CODdemand < 0
-            CODdemand = 0;
-        else
-        end
-    elseif CODdemand == dCdt(5,13)
-        dCdt(5,13) = dCdt(5,13) - CODdemand;
-        CODdemand = - dCdt(5,13);
-    end
-    if CODdemand > dCdt(6,13)
-    CODdemand = CODdemand - dCdt(6,13);
-    dCdt(6,13) = -CODdemand;
-        if dCdt(6,13) < 0
-            dCdt(6,13) = 0;
-        else
-        end
-    elseif CODdemand < dCdt(6,13)
-        dCdt(6,13) = dCdt(6,13) - CODdemand;
-        CODdemand = - dCdt(6,13);
-        if CODdemand < 0
-            CODdemand = 0;
-        else
-        end
-    elseif CODdemand == dCdt(6,13)
-        dCdt(6,13) = dCdt(6,13) - CODdemand;
-        CODdemand = - dCdt(6,13);
-    end
-    % Soluble Organic Nitrogen
-    ReqCODs = dCdt(11,13)/Naa; % Naa is nitrogen fraction of the amino acid state variable, Saa
-    if dCdt(2,13) > ReqCODs
-        Saa = ReqCODs;
-        Ssu_A = dCdt(2,13) - ReqCODs;
-    else
-        Saa = dCdt(2,13);
-        Ssu_A = 0;
-    end
-    % Soluble Inert Organic Material
-    CODin = dCdt(1,13) + dCdt(2,13) + dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13);
-    CODremain = CODin - dCdt(2,13);
-    OrgN = dCdt(11,13) + dCdt(12,13)- dCdt(10,13);
-    OrgNremain = OrgN - Saa*Naa;
-    ReqOrgNs = Ni*dCdt(1,13);
-    if OrgNremain > ReqOrgNs
-        Si_ADM = dCdt(1,13);
-        Ssu = Ssu_A;
-    else
-        Si_ADM = OrgNremain/Ni;
-        Ssu = Ssu_A + dCdt(1,13) - Si_ADM;
-    end
-    CODremain = CODremain - dCdt(1,13);
-    OrgNremain = OrgNremain - Si_ADM*Ni;
-    % Particulate Inert  COD mapping
-    ReqOrgNx = fxi*(dCdt(3,13) + dCdt(7,13))*Ni;
-    if OrgNremain > ReqOrgNx
-        Xi_ADM = fxi*(dCdt(3,13) + dCdt(7,13));
-    else
-        Xi_ADM = OrgNremain/Ni;
-    end
-    CODremain = CODremain - Xi_ADM;
-    OrgNremain = OrgNremain - Xi_ADM*Ni;
-    % Partitioning of Remaining COD and TKN
-    ReqCODXc = OrgNremain/Nxc;
-    if CODremain > ReqCODXc
-        Xc = ReqCODXc;
-        Xch = (fch_xc/(fch_xc + fli_xc))*(CODremain - Xc);
-        Xli = (fli_xc/(fch_xc + fli_xc))*(CODremain - Xc);
-        Sin = dCdt(10,13);
-    else
-        Xc = CODremain;
-        Xch = 0;
-        Xli = 0;
-        Sin = dCdt(10,13) + OrgNremain - Xc*Nxc;
-    end
-    % CODremain and TNKremain should be zero.
-    Scat = dCdt(13,13) + 0.035;
-    San = Sin;
-         
-    %% Conversion from ADM1 to ASM1
-    CODconserved = CODt_anaerobic - Sh2 - Sch4;
-    % COD Conversions
-    dCdt(1,effluent) = Si_ADM;
-    dCdt(3,eff) = Xi_ADM;
-    dCdt(2,eff) = Ssu + Saa + Sfa + Sva + Sbu + Spro + Sac;
-    dCdt(4,eff) = Xc + Xch + Xpr + Xli + Xsu + Xaa + Xfa + Xc4 + Xpro + Xac + Xh2;
-    % TKN Conversions
-    dCdt(10,eff) = Sin;
-    dCdt(11,eff) = Si_ADM*Ni + Saa*Naa;
-    dCdt(12,eff) = Nbac*(Xsu + Xaa + Xfa + Xc4 + Xpro + Xac + Xh2) + Ni*Xi + Nxc*Xc + Naa*Xpr - ixe*Xi;
-    dCdt(5,eff) = 0;
-    dCdt(6,eff) = 0;
-    dCdt(7,eff) = 0;
-    dCdt(13,eff) = Sic; 
+%     dCdt(i,13) = (dCdt(i,12)*Q(12) + dCdt(i,3)*Q(3))/Q(13);
+%     CODdemand = dCdt(8,13) + 2.86*dCdt(9,13);
+%     % Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
+%     if CODdemand < (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
+%         disp('Warning! Influent characterization may need to be evaluated, not enough COD available')
+%     else
+%     end
+%     if CODdemand > dCdt(2,13)
+%     CODdemand = CODdemand - dCdt(2,13);
+%     dCdt(2,13) = -CODdemand;
+%         if dCdt(2,13) < 0
+%             dCdt(2,13) = 0;
+%         else
+%         end
+%     elseif CODdemand < dCdt(2,13)
+%         dCdt(2,13) = dCdt(2,13) - CODdemand;
+%         CODdemand = - dCdt(2,13);
+%         if CODdemand < 0
+%             CODdemand = 0;
+%         else
+%         end
+%     elseif CODdemand == dCdt(2,13)
+%         dCdt(2,13) = dCdt(2,13) - CODdemand;
+%         CODdemand = - dCdt(2,13);
+%     end
+%     if CODdemand > dCdt(4,13)
+%         CODdemand = CODdemand - dCdt(4,13);
+%         dCdt(4,13) = -CODdemand;
+%             if dCdt(4,13) < 0
+%                 dCdt(4,13) = 0;
+%             else
+%             end
+%     elseif CODdemand < dCdt(4,13)
+%         dCdt(4,13) = dCdt(4,13) - CODdemand;
+%         CODdemand = - dCdt(4,13);
+%         if CODdemand < 0
+%             CODdemand = 0;
+%         else
+%         end
+%     elseif CODdemand == dCdt(4,13)
+%         dCdt(4,13) = dCdt(4,13) - CODdemand;
+%         CODdemand = - dCdt(4,13);
+%     end
+%     if CODdemand > dCdt(5,13)
+%     CODdemand = CODdemand - dCdt(5,13);
+%     dCdt(5,13) = -CODdemand;
+%         if dCdt(5,13) < 0
+%             dCdt(5,13) = 0;
+%         else
+%         end
+%     elseif CODdemand < dCdt(5,13)
+%         dCdt(5,13) = dCdt(5,13) - CODdemand;
+%         CODdemand = - dCdt(5,13);
+%         if CODdemand < 0
+%             CODdemand = 0;
+%         else
+%         end
+%     elseif CODdemand == dCdt(5,13)
+%         dCdt(5,13) = dCdt(5,13) - CODdemand;
+%         CODdemand = - dCdt(5,13);
+%     end
+%     if CODdemand > dCdt(6,13)
+%     CODdemand = CODdemand - dCdt(6,13);
+%     dCdt(6,13) = -CODdemand;
+%         if dCdt(6,13) < 0
+%             dCdt(6,13) = 0;
+%         else
+%         end
+%     elseif CODdemand < dCdt(6,13)
+%         dCdt(6,13) = dCdt(6,13) - CODdemand;
+%         CODdemand = - dCdt(6,13);
+%         if CODdemand < 0
+%             CODdemand = 0;
+%         else
+%         end
+%     elseif CODdemand == dCdt(6,13)
+%         dCdt(6,13) = dCdt(6,13) - CODdemand;
+%         CODdemand = - dCdt(6,13);
+%     end
+%     % Soluble Organic Nitrogen
+%     ReqCODs = dCdt(11,13)/Naa; % Naa is nitrogen fraction of the amino acid state variable, Saa
+%     if dCdt(2,13) > ReqCODs
+%         Saa = ReqCODs;
+%         Ssu_A = dCdt(2,13) - ReqCODs;
+%     else
+%         Saa = dCdt(2,13);
+%         Ssu_A = 0;
+%     end
+%     % Soluble Inert Organic Material
+%     CODin = dCdt(1,13) + dCdt(2,13) + dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13);
+%     CODremain = CODin - dCdt(2,13);
+%     OrgN = dCdt(11,13) + dCdt(12,13)- dCdt(10,13);
+%     OrgNremain = OrgN - Saa*Naa;
+%     ReqOrgNs = Ni*dCdt(1,13);
+%     if OrgNremain > ReqOrgNs
+%         Si_ADM = dCdt(1,13);
+%         Ssu = Ssu_A;
+%     else
+%         Si_ADM = OrgNremain/Ni;
+%         Ssu = Ssu_A + dCdt(1,13) - Si_ADM;
+%     end
+%     CODremain = CODremain - dCdt(1,13);
+%     OrgNremain = OrgNremain - Si_ADM*Ni;
+%     % Particulate Inert  COD mapping
+%     ReqOrgNx = fxi*(dCdt(3,13) + dCdt(7,13))*Ni;
+%     if OrgNremain > ReqOrgNx
+%         Xi_ADM = fxi*(dCdt(3,13) + dCdt(7,13));
+%     else
+%         Xi_ADM = OrgNremain/Ni;
+%     end
+%     CODremain = CODremain - Xi_ADM;
+%     OrgNremain = OrgNremain - Xi_ADM*Ni;
+%     % Partitioning of Remaining COD and TKN
+%     ReqCODXc = OrgNremain/Nxc;
+%     if CODremain > ReqCODXc
+%         Xc = ReqCODXc;
+%         Xch = (fch_xc/(fch_xc + fli_xc))*(CODremain - Xc);
+%         Xli = (fli_xc/(fch_xc + fli_xc))*(CODremain - Xc);
+%         Sin = dCdt(10,13);
+%     else
+%         Xc = CODremain;
+%         Xch = 0;
+%         Xli = 0;
+%         Sin = dCdt(10,13) + OrgNremain - Xc*Nxc;
+%     end
+%     % CODremain and TNKremain should be zero.
+%     Scat = dCdt(13,13) + 0.035;
+%     San = Sin;
+%          
+%     %% Conversion from ADM1 to ASM1
+%     CODconserved = CODt_anaerobic - Sh2 - Sch4;
+%     % COD Conversions
+%     dCdt(1,effluent) = Si_ADM;
+%     dCdt(3,eff) = Xi_ADM;
+%     dCdt(2,eff) = Ssu + Saa + Sfa + Sva + Sbu + Spro + Sac;
+%     dCdt(4,eff) = Xc + Xch + Xpr + Xli + Xsu + Xaa + Xfa + Xc4 + Xpro + Xac + Xh2;
+%     % TKN Conversions
+%     dCdt(10,eff) = Sin;
+%     dCdt(11,eff) = Si_ADM*Ni + Saa*Naa;
+%     dCdt(12,eff) = Nbac*(Xsu + Xaa + Xfa + Xc4 + Xpro + Xac + Xh2) + Ni*Xi + Nxc*Xc + Naa*Xpr - ixe*Xi;
+%     dCdt(5,eff) = 0;
+%     dCdt(6,eff) = 0;
+%     dCdt(7,eff) = 0;
+%     dCdt(8,eff) = 0;
+%     dCdt(13,eff) = Sic; 
     i = i + 1;
 end
 vec_len = numel(Conc);
