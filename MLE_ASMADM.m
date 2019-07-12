@@ -7,6 +7,7 @@ tic
     
 % Implement ODE/system equations for ADM1
     % d_1_code,IndataADM1_v2,ADM1_fun_v2_ODE
+    % Pass in a structure for intial conditions, one for MLE and other for AD
 % Implement thickener(before AD)/dewatering(after AD)/dryer(after AD)
 % Implement denitrification filter
 
@@ -54,7 +55,7 @@ param = [0.67 0.24 0.08 0.08 ...
 %% simulation time span (days)
 t = 1:0.1:29;
 % Sample rate
-    % Decrease sample rate more better DO control, but ODE takes longer
+    % Decrease sample rate for better DO control, but ODE takes longer
 sp = 1/5;
 tsample = t + sp*t;
 %% Convert typical units coming into plant to ASM1 variables
@@ -158,8 +159,9 @@ PlantInflow_out = [];
 T_out = [];
 MCRT_out = [];
 % Optimize ODE solver
-figure(1)
-opts = odeset('MStateDependence','JPattern','Stats','on','OutputFcn',@odeplot);
+%figure(1)
+%opts = odeset('MStateDependence','JPattern','Stats','on','OutputFcn',@odeplot);
+opts = odeset('MStateDependence','JPattern');
 ODE_sol = ode15s(@(t,x) MLE(t,x,param,Rir,Rr,fpc,fsc,Qflow,Qt,Ct,C,tsample),t,x,opts);
 
 %% Results
@@ -215,6 +217,7 @@ end
 
 toc
 function [Conc] = MLE(t,dCdt,param,Rir,Rr,fpc,fsc,Qflow,Qt,Ct,C,tsample)
+persistent KLa
 % Fixes structure of intial values from vector to an array
 dCdt = reshape(dCdt,[13,12]);
 %% Dynamic flow
@@ -279,7 +282,6 @@ Kx = param(18);
 nh = param(19);
 
 % O2 transference
-KLa = param(20); % Oxygen transfer coefficient
 So_sat = param(21); % gO2/m3
 
 % Equipment volumes
@@ -450,19 +452,23 @@ while i < (length(dCdt)+1)
     Conc(i,5) = 1/Vol2*(Q(4)*dCdt(i,4) - Q(5)*dCdt(i,5)) + K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8); % Anoxic balance
     Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
     if i == 8
-%         % Rough control of DO in aeration zone
-%         tadj = round(t*100)/100;
-%         t_find = find(tadj == tsample);
-%         dCdt(10,6);
-%         dCdt(8,6);
-%         if numel(t_find) > 0
-%             if dCdt(10,6) > 5
-%                 KLa = param(20);
-%             else
-%                 KLa = 0;
-%             end
-%         else
-%         end
+        % Rough control of DO in aeration zone
+        tadj = round(t*100)/100;
+        t_find = find(tadj == tsample);
+        dCdt(10,6);
+        dCdt(8,6);
+        if t == 1
+            KLa = param(20); % Oxygen transfer coefficient
+        else
+        end
+        if numel(t_find) > 0
+            if dCdt(10,6) > 5
+                KLa = param(20);
+            else
+                KLa = 0;
+            end
+        else
+        end
         Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
     else 
         Conc(i,6) = Conc(i,6);
@@ -628,7 +634,8 @@ vec_len = numel(Conc);
 Conc = reshape(Conc,[vec_len,1]);
 % Due to Conc only changing in the reactors, dCdt variable needs to be
 % saved and sent to the workspace.
-fprintf('Current simulation time is %6.2f days\n',t)
+
+fprintf('Current simulation time is %6.6f days\n',t)
 assignin('base','VarConc',dCdt);
 evalin('base','VarConc_out = [VarConc_out;VarConc];');
 assignin('base','T_step',t);
