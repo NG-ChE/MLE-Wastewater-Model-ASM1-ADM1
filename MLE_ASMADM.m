@@ -129,8 +129,44 @@ Snho = 5; % NH 4+ + NH 3 nitrogen
 Sndo = 6.95; % Soluble biodegradable organic nitrogen
 Xndo = 5; % Particulate biodegradable organic nitrogen
 Salko = 7; % Alkalinity
-x_int = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko]; % Create vector of initial values for the MLE system
-x = x_int(:)*ones(1,12); % Format to an array of [components,streams] -> maybe send to ODE function to allow the initial conditions to be adjusted for added streams
+MLE_int = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko]; % Create vector of initial values for the MLE system
+AD_int = [0.009;... % S_su
+0.0009;... % S_aa
+0.0009;... % S_faD.1. 
+0.0009;... % S_va
+0.0009;... % S_bu
+0.0009;... % S_pro
+0.0009;... % S_ac
+2.3594e-9;...%S_h2
+2.3594e-6;...%S_ch4
+0.039;... %S_IC
+0.13023;... %S_IN
+0.009;... %S_I
+0.30870;... %X_c
+0.02795;... %X_ch
+0.10260;... %X_pr
+0.02948; ... %X_li
+0.42016;... %X_su
+1.17917;... %X_aa
+0.24303;... %X_fa
+0.43192;... %X_c4
+0.13730;... %X_pro
+0.76056;... %X_ac
+0.31702;... %X_h2
+25.61739;... %X_I
+0.04;... %S_cat
+0.02;... %S_an
+0.0116;... %S_vam
+0.01322;... %S_bum
+0.01574;... %S_prom
+0.19724;... %S_acm
+0.14278;... %S_hco3m
+0.00409;... %S_nh3
+1.023e-5;... %h2
+1.62125;... %ch4
+0.01411]'; %co2
+sys_int = [MLE_int AD_int]; % Intial conditions for AD (comp 14-48) are unnessary as they will be overwritten in the main file and parsed out after
+x = sys_int(:)*ones(1,15); % Format to an array of [components,streams] -> maybe send to ODE function to allow the initial conditions to be adjusted for added streams
 
 %% Import data for varying influent flow
 dat_dry=importdata('datos/Inf_dry_2006.txt','\t',1);
@@ -166,7 +202,7 @@ end
   
 %% ODE
 % Intialize variables for assignin
-VarConc_out = zeros(13,12); 
+VarConc_out = zeros(48,15); 
 PlantInflow_out = [];
 T_out = [];
 MCRT_out = [];
@@ -181,7 +217,17 @@ ODE_sol = ode15s(odefunc,t,x,opts);
 % Get the data for each stream from the column of Concentration, then
 % manipulate each array to be used for graphing
 
-VarConc_out(1:13,:) = []; % Delete dummy rows
+VarConc_out(1:48,:) = []; % Delete dummy rows
+% Set first 13 rows to var then delete 
+% Set the next 35 rows to a different var then delete 
+% Reloop
+% [r,c] = VarConc_out;
+% r = r; % total rows
+% c = c;  % total columns
+% d = r; % rows in each data set 
+% n = 13;  % remove first n rows in each data set
+% A(mod(1:r,d)<=n & mod(1:r,d)>0,:) = [];
+
 Concentration = VarConc_out; 
 time = T_out;
 j = 1;
@@ -192,7 +238,7 @@ figure(2)
 while j < (16+1)
     if j < (col+1)
     rev = num2str(j);
-    stream.rev = reshape(Concentration(:,j),[13,length(time)])';
+    stream.rev = reshape(Concentration(:,j),[15,length(time)])';
     subplot(4,4,j);
     plot(time,stream.rev);
     title(['Stream ' rev])
@@ -234,8 +280,6 @@ function [Conc] = MLE(t,dCdt,Var,l)
 persistent KLa
 CompASM = 13;
 CompADM = 35;
-% Fixes structure of intial values from vector to an array
-dCdt = reshape(dCdt,[13,12]);
 %% Dynamic flow
 Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow at specified time
 %% Flow solver
@@ -278,6 +322,8 @@ Q(3) + Q(11) - Q(13);
 Q(13) - Q(15);
 ];
 end
+% Fixes structure of intial values from vector to an array
+dCdt = reshape(dCdt,[length(dCdt)/length(Q),length(Q)]);
 %% Assigning Parameters
 % Stoichiometric
 Yh = Var.param(1); % gCOD(biomassformed)/gCOD(substrate removed)
@@ -484,14 +530,14 @@ while i < (CompASM + 1)
             KLa = Var.param(20); % Oxygen transfer coefficient
         else
         end
-        if numel(t_find) > 0
-            if dCdt(10,6) > 5
-                KLa = Var.param(20);
-            else
-                KLa = 0;
-            end
-        else
-        end
+%         if numel(t_find) > 0
+%             if dCdt(10,6) > 5
+%                 KLa = Var.param(20);
+%             else
+%                 KLa = 0;
+%             end
+%         else
+%         end
         Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
     else 
         Conc(i,6) = Conc(i,6);
@@ -519,10 +565,10 @@ while i < (CompASM + 1)
     % Assuming alkilinity is calcium carbonate for C conversion
     Alkc = (0.001/1000)*(12/(12 + 16*3 + 40.078)); % Convert mol/L of Alkalinity to kmol-C/m3
     CODdemand = dCdt(8,13) + 2.86*dCdt(9,13);
-    if CODdemand < (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
-        disp('Warning! Influent characterization may need to be evaluated, not enough COD available')
-    else
-    end
+%     if CODdemand < (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
+%         disp('Warning! Influent characterization may need to be evaluated, not enough COD available')
+%     else
+%     end
     if CODdemand > dCdt(2,13)
     CODdemand = CODdemand - dCdt(2,13);
     dCdt(2,13) = - CODdemand;
@@ -596,90 +642,118 @@ while i < (CompASM + 1)
         CODdemand = - dCdt(6,13);
     end
     %% Soluble Organic Nitrogen
-    ReqCODs = (dCdt(11,13)*Nc)/Naa; % Naa is nitrogen fraction of the amino acid state variable, Saa
+    ReqCODs = (dCdt(11,13)*Nc)/l.N_aa; % Naa is nitrogen fraction of the amino acid state variable, Saa
     if dCdt(2,13)*CODc > ReqCODs
-        S_aa = ReqCODs;
-        S_su = dCdt(2,13)*CODc - ReqCODs;
+        S_aa_in = ReqCODs;
+        S_su_in = dCdt(2,13)*CODc - ReqCODs;
     else
-        S_aa = dCdt(2,13)*CODc;
-        S_su = 0;
+        S_aa_in = dCdt(2,13)*CODc;
+        S_su_in = 0.000000001;
     end
     
     %% Soluble Inert Organic Material
     CODin = dCdt(1,13) + dCdt(2,13) + dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13);
     CODremain = (CODin - dCdt(2,13))*CODc;
     OrgN = dCdt(11,13) + dCdt(12,13)- dCdt(10,13);
-    OrgNremain = OrgN*Nc - S_aa*l.N_aa;
+    OrgNremain = OrgN*Nc - S_aa_in*l.N_aa;
     ReqOrgNs = l.N_I*dCdt(1,13)*CODc;
     if OrgNremain > ReqOrgNs
-        S_I = dCdt(1,13)*CODc;
-        S_su = S_su;
+        S_I_in = dCdt(1,13)*CODc;
+        S_su_in = S_su_in;
     else
-        S_I = OrgNremain/l.N_I;
-        S_su = S_su + dCdt(1,13)*CODc - S_I;
+        S_I_in = OrgNremain/l.N_I;
+        S_su_in = S_su_in + dCdt(1,13)*CODc - S_I_in;
     end
     CODremain = CODremain - dCdt(1,13)*CODc;
-    OrgNremain = OrgNremain - S_I*l.N_I;
+    OrgNremain = OrgNremain - S_I_in*l.N_I;
     
     %% Particulate Inert  COD mapping
     ReqOrgNx = l.f_xI_xc*(dCdt(3,13) + dCdt(7,13))*l.N_I*CODc;
     if OrgNremain > ReqOrgNx
-        X_I = l.f_xI_xc*(dCdt(3,13) + dCdt(7,13))*CODc;
+        X_I_in = l.f_xI_xc*(dCdt(3,13) + dCdt(7,13))*CODc;
     else
-        X_I = OrgNremain/l.N_I;
+        X_I_in = OrgNremain/l.N_I;
     end
-    CODremain = CODremain - X_I;
-    OrgNremain = OrgNremain - X_I*l.N_I;
+    CODremain = CODremain - X_I_in;
+    OrgNremain = OrgNremain - X_I_in*l.N_I;
     
     %% Partitioning of Remaining COD and TKN
-    ReqCODXc = OrgNremain/Nxc;
+    ReqCODXc = OrgNremain/l.N_xc;
     if CODremain > ReqCODXc
-        X_c = ReqCODXc;
-        X_ch = (l.f_ch_xc/(l.f_ch_xc + l.f_li_xc))*(CODremain - X_c);
-        X_li = (l.f_li_xc/(l.f_ch_xc + l.f_li_xc))*(CODremain - X_c);
-        S_IN = dCdt(10,13)*Nc;
+        X_c_in = ReqCODXc;
+        X_ch_in = (l.f_ch_xc/(l.f_ch_xc + l.f_li_xc))*(CODremain - X_c_in);
+        X_li_in = (l.f_li_xc/(l.f_ch_xc + l.f_li_xc))*(CODremain - X_c_in);
+        S_IN_in = dCdt(10,13)*Nc;
     else
-        X_c = CODremain;
-        X_ch = 0;
-        X_li = 0;
-        S_IN = dCdt(10,13)*Nc + OrgNremain - X_c*l.N_xc;
+        X_c_in = CODremain;
+        X_ch_in = 0;
+        X_li_in = 0;
+        S_IN_in = dCdt(10,13)*Nc + OrgNremain - X_c_in*l.N_xc;
     end
     % CODremain and TNKremain should be zero.
-    disp(CODremain)
-    disp(OrgNremain)
-    S_IC = dCdt(13,13)*Alkc;
-    S_cat = S_IC + 0.035;
-    S_an = S_IN;
+    %disp(CODremain)
+    %disp(OrgNremain)
+    S_IC_in = dCdt(13,13)*Alkc;
+    S_cat_in = S_IC_in + 0.035;
+    S_an_in = S_IN_in;
+    % Remaing influent components unaccounted for in the ASM/ADM conversion
+    S_fa_in = 0.0001;
+    S_va_in = 0.0001;
+    S_bu_in = 0.0001;
+    S_pro_in = 0.0001;
+    S_ac_in = 0.0001;
+    S_h2_in = 0.0001;
+    S_ch4_in = 0.0001;
+    X_xc_in = 0.0001;
+    X_pr_in = 0.0001;
+    X_su_in = 0.0001;
+    X_aa_in = 0.0001;
+    X_fa_in = 0.0001;
+    X_c4_in = 0.0001;
+    X_pro_in = 0.0001;
+    X_ac_in = 0.0001;
+    X_h2_in = 0.0001;
 %% AD differential equations
 % Data/Equations pulled from Aspects on ADM1 implementation within the BSM2 framework
 % CHECK PARAMETERS -> CHANGE VOLUMES (headspace/liquid)
     %Separate the components under ENTIRE while function, this part under
     %while (i > compASM) && (i < (compADM + 1))
-    S_fa = y(3);
-    S_va = y(4);
-    S_bu = y(5);
-    S_pro = y(6);
-    S_ac = y(7);
-    S_h2 = y(8);
-    S_ch4 = y(9);
-    X_pr = y(15);
-    X_su = y(17);
-    X_aa = y(18);
-    X_fa = y(19);
-    X_c4 = y(20);
-    X_pro = y(21);
-    X_ac = y(22);
-    X_h2 = y(23);
-    S_an = y(26);
-    S_vam = y(27);
-    S_bum = y(28);
-    S_prom= y(29);
-    S_acm = y(30);
-    S_hco3m=y(31);
-    S_nh3 = y(32);
-    S_gas_h2 = y(33);
-    S_gas_ch4 = y(34);
-    S_gas_co2 = y(35);
+    % Intial conditions inside reactor
+    S_su = dCdt(14,15);
+    S_aa = dCdt(15,15);
+    S_fa = dCdt(16,15);
+    S_va = dCdt(17,15);
+    S_bu = dCdt(18,15);
+    S_pro = dCdt(19,15);
+    S_ac = dCdt(20,15);
+    S_h2 = dCdt(21,15);
+    S_ch4 = dCdt(22,15);
+    S_IC = dCdt(23,15);
+    S_IN = dCdt(24,15);
+    S_I = dCdt(25,15);
+    X_c = dCdt(26,15);
+    X_ch = dCdt(27,15);
+    X_pr = dCdt(28,15);
+    X_li = dCdt(29,15);
+    X_su = dCdt(30,15);
+    X_aa = dCdt(31,15);
+    X_fa = dCdt(32,15);
+    X_c4 = dCdt(33,15);
+    X_pro = dCdt(34,15);
+    X_ac = dCdt(35,15);
+    X_h2 = dCdt(36,15);
+    X_I = dCdt(37,15);
+    S_cat = dCdt(38,15);
+    S_an = dCdt(39,15);
+    S_vam = dCdt(40,15);
+    S_bum = dCdt(41,15);
+    S_prom = dCdt(42,15);
+    S_acm = dCdt(43,15);
+    S_hco3m = dCdt(44,15);
+    S_nh3 = dCdt(45,15);
+    S_gas_h2 = dCdt(46,14);
+    S_gas_ch4 = dCdt(47,14);
+    S_gas_co2 = dCdt(48,14);
     
     % Gas pressure
     P_gas_h2 = S_gas_h2*l.R*l.T_op/16;
@@ -758,7 +832,7 @@ while i < (CompASM + 1)
     rho_A_6 = l.k_A_B_pro*(S_prom*(l.K_a_pro + Sh) - l.K_a_pro*S_pro);
     rho_A_7 = l.k_A_B_ac*(S_acm*(l.K_a_ac + Sh) - l.K_a_ac*S_ac);
     rho_A_10 = l.k_A_B_co2*(S_hco3m*(l.K_a_co2 + Sh) - l.K_a_co2*S_IC);
-    rho_A_11 = l.k_A_B_IN*(S_nh3*(l.K_a_IN+Sh) - l.K_a_IN*S_IN);
+    rho_A_11 = l.k_A_B_IN*(S_nh3*(l.K_a_IN + Sh) - l.K_a_IN*S_IN);
     
     % Gas transfer rates
     rho_T_8 = l.k_L_a*(S_h2 - 16*l.K_H_h2*P_gas_h2);
@@ -783,77 +857,77 @@ while i < (CompASM + 1)
     
     %Differential equations 1-4, soluble matter
                                                                                                 % State No.
-    d_S_su_dt = l.q_in/l.V_liq*(l.S_su_in - S_su) + rho_2 + (1 - l.f_fa_li)*rho_4 - rho_5;      % 1
-    d_S_aa_dt = l.q_in/l.V_liq*(l.S_aa_in - S_aa) + rho_3 - rho_6;                              % 2
-    d_S_fa_dt = l.q_in/l.V_liq*(l.S_fa_in - S_fa) + l.f_fa_li*rho_4 - rho_7;                    % 3
-    d_S_va_dt = l.q_in/l.V_liq*(l.S_va_in - S_va) + (1 - l.Y_aa)*l.f_va_aa*rho_6 - rho_8;       % 4
+    Conc(14,15) = Q(13)/l.V_liq*(S_su_in - S_su) + rho_2 + (1 - l.f_fa_li)*rho_4 - rho_5;      % 1
+    Conc(15,15) = Q(13)/l.V_liq*(S_aa_in - S_aa) + rho_3 - rho_6;                              % 2
+    Conc(16,15) = Q(13)/l.V_liq*(S_fa_in - S_fa) + l.f_fa_li*rho_4 - rho_7;                    % 3
+    Conc(17,15) = Q(13)/l.V_liq*(S_va_in - S_va) + (1 - l.Y_aa)*l.f_va_aa*rho_6 - rho_8;       % 4
     
     % Differential equations 5-8, soluble matter
-    d_S_bu_dt = l.q_in/l.V_liq*(l.S_bu_in - S_bu) + (1 - l.Y_su)*l.f_bu_su*rho_5 + ...          % 5
+    Conc(18,15) = Q(13)/l.V_liq*(S_bu_in - S_bu) + (1 - l.Y_su)*l.f_bu_su*rho_5 + ...          % 5
     (1 - l.Y_aa)*l.f_bu_aa*rho_6 - rho_9; 
-    d_S_pro_dt = l.q_in/l.V_liq*(l.S_pro_in-S_pro) + (1 - l.Y_su)*l.f_pro_su*rho_5 + ...        % 6 
+    Conc(19,15) = Q(13)/l.V_liq*(S_pro_in-S_pro) + (1 - l.Y_su)*l.f_pro_su*rho_5 + ...         % 6 
     (1 - l.Y_aa)*l.f_pro_aa*rho_6 + (1-l.Y_c4)*0.54*rho_8 - rho_10;
-    d_S_ac_dt = l.q_in/l.V_liq*(l.S_ac_in-S_ac) + (1 - l.Y_su)*l.f_ac_su*rho_5 + ...            % 7
+    Conc(20,15) = Q(13)/l.V_liq*(S_ac_in-S_ac) + (1 - l.Y_su)*l.f_ac_su*rho_5 + ...            % 7
     (1 - l.Y_aa)*l.f_ac_aa*rho_6 + (1 - l.Y_fa)*0.7*rho_7 + ... 
     (1 - l.Y_c4)*0.31*rho_8 + (1-l.Y_c4)*0.8*rho_9 + ... 
     (1 - l.Y_pro)*0.57*rho_10 - rho_11;
-    d_S_h2_dt = l.q_in/l.V_liq*(l.S_h2_in - S_h2) + (1 - l.Y_su)*l.f_h2_su*rho_5 + ...          % 8
+    Conc(21,15) = Q(13)/l.V_liq*(S_h2_in - S_h2) + (1 - l.Y_su)*l.f_h2_su*rho_5 + ...          % 8
     (1 - l.Y_aa)*l.f_h2_aa*rho_6 + (1 - l.Y_fa)*0.3*rho_7 + ... 
     (1 - l.Y_c4)*0.15*rho_8 + (1 - l.Y_c4)*0.2*rho_9 + ... 
     (1 - l.Y_pro)*0.43*rho_10 - rho_12 - rho_T_8;
 
     % Differential equations 9-12, soluble matter (added IC and IN?terms for new prep.)
-    d_S_ch4_dt = l.q_in/l.V_liq*(l.S_ch4_in - S_ch4) + (1 - l.Y_ac)*rho_11 + ...                % 9
+    Conc(22,15) = Q(13)/l.V_liq*(S_ch4_in - S_ch4) + (1 - l.Y_ac)*rho_11 + ...                 % 9
     (1 - l.Y_h2)*rho_12 - rho_T_9; 
-    d_S_IC_dt = l.q_in/l.V_liq*(l.S_IC_in - S_IC) - (s_1*rho_1 + s_2*rho_2 + ...                % 10
+    Conc(23,15) = Q(13)/l.V_liq*(S_IC_in - S_IC) - (s_1*rho_1 + s_2*rho_2 + ...                % 10
     s_3*rho_3 + s_4*rho_4 + s_5*rho_5 + s_6*rho_6 + s_7*rho_7 + ... 
     s_8*rho_8 + s_9*rho_9 + s_10*rho_10 + s_11*rho_11 + s_12*rho_12 + ... 
-    s_20*rho_20 + s_21*rho_21 + s_13*(rho_13 + rho_14 + rho_15 + rho_16... 
+    s_13*(rho_13 + rho_14 + rho_15 + rho_16... 
     + rho_17 + rho_18 + rho_19)) - rho_T_10; 
-    d_S_IN_dt = l.q_in/l.V_liq*(l.S_IN_in - S_IN) - l.Y_su*l.N_bac*rho_5 + ...                  % 11
+    Conc(24,15) = Q(13)/l.V_liq*(S_IN_in - S_IN) - l.Y_su*l.N_bac*rho_5 + ...                  % 11
     (l.N_aa - l.Y_aa*l.N_bac)*rho_6 - l.Y_fa*l.N_bac*rho_7 - ... 
     l.Y_c4*l.N_bac*rho_8 - l.Y_c4*l.N_bac*rho_9 - ... 
     l.Y_pro*l.N_bac*rho_10 - l.Y_ac*l.N_bac*rho_11 - ... 
     l.Y_h2*l.N_bac*rho_12 + (l.N_bac - l.N_xc)*... 
     (rho_13 + rho_14 + rho_15 + rho_16 + rho_17 + rho_18 +... 
     rho_19) + (l.N_xc - l.f_xI_xc*l.N_I - l.f_sI_xc*l.N_I - l.f_pr_xc*l.N_aa)*rho_1; 
-    d_S_I_dt = l.q_in/l.V_liq*(l.S_I_in - S_I) + l.f_sI_xc*rho_1;                               % 12
+    Conc(25,15) = Q(13)/l.V_liq*(S_I_in - S_I) + l.f_sI_xc*rho_1;                              % 12
     
     % Differential equations 13-16, particulate matter
-    d_X_c_dt = l.q_in/l.V_liq*(l.X_xc_in - X_c) - rho_1 + ...                                   % 13
+    Conc(26,15) = Q(13)/l.V_liq*(X_xc_in - X_c) - rho_1 + ...                                  % 13
     rho_13 + rho_14 + rho_15 + rho_16 + rho_17 + rho_18 + rho_19; 
-    d_X_ch_dt = l.q_in/l.V_liq*(l.X_ch_in - X_ch) + l.f_ch_xc*rho_1 - rho_2;                    % 14
-    d_X_pr_dt = l.q_in/l.V_liq*(l.X_pr_in - X_pr) + l.f_pr_xc*rho_1 - rho_3;                    % 15
-    d_X_li_dt = l.q_in/l.V_liq*(l.X_li_in - X_li) + l.f_li_xc*rho_1 - rho_4;                    % 16
+    Conc(27,15) = Q(13)/l.V_liq*(X_ch_in - X_ch) + l.f_ch_xc*rho_1 - rho_2;                    % 14
+    Conc(28,15) = Q(13)/l.V_liq*(X_pr_in - X_pr) + l.f_pr_xc*rho_1 - rho_3;                    % 15
+    Conc(29,15) = Q(13)/l.V_liq*(X_li_in - X_li) + l.f_li_xc*rho_1 - rho_4;                    % 16
     
     % Differential equations 17-20, particulate matter
-    d_X_su_dt = l.q_in/l.V_liq*(l.X_su_in - X_su) + l.Y_su*rho_5 - rho_13;                      % 17
-    d_X_aa_dt = l.q_in/l.V_liq*(l.X_aa_in - X_aa) + l.Y_aa*rho_6 - rho_14;                      % 18
-    d_X_fa_dt = l.q_in/l.V_liq*(l.X_fa_in - X_fa) + l.Y_fa*rho_7 - rho_15;                      % 19
-    d_X_c4_dt = l.q_in/l.V_liq*(l.X_c4_in - X_c4) + l.Y_c4*rho_8 + l.Y_c4*rho_9 - rho_16;       % 20
+    Conc(30,15) = Q(13)/l.V_liq*(X_su_in - X_su) + l.Y_su*rho_5 - rho_13;                      % 17
+    Conc(31,15) = Q(13)/l.V_liq*(X_aa_in - X_aa) + l.Y_aa*rho_6 - rho_14;                      % 18
+    Conc(32,15) = Q(13)/l.V_liq*(X_fa_in - X_fa) + l.Y_fa*rho_7 - rho_15;                      % 19
+    Conc(33,15)  = Q(13)/l.V_liq*(X_c4_in - X_c4) + l.Y_c4*rho_8 + l.Y_c4*rho_9 - rho_16;      % 20
     
     % Differential equations 21-24, particulate matter
-    d_X_pro_dt = l.q_in/l.V_liq*(l.X_pro_in - X_pro) + l.Y_pro*rho_10 - rho_17;                 % 21
-    d_X_ac_dt = l.q_in/l.V_liq*(l.X_ac_in - X_ac) + l.Y_ac*rho_11 - rho_18;                     % 22
-    d_X_h2_dt = l.q_in/l.V_liq*(l.X_h2_in - X_h2) + l.Y_h2*rho_12 - rho_19;                     % 23
-    d_X_I_dt = l.q_in/l.V_liq*(l.X_I_in - X_I) + l.f_xI_xc*rho_1;                               % 24
+    Conc(34,15) = Q(13)/l.V_liq*(X_pro_in - X_pro) + l.Y_pro*rho_10 - rho_17;                  % 21
+    Conc(35,15) = Q(13)/l.V_liq*(X_ac_in - X_ac) + l.Y_ac*rho_11 - rho_18;                     % 22
+    Conc(36,15) = Q(13)/l.V_liq*(X_h2_in - X_h2) + l.Y_h2*rho_12 - rho_19;                     % 23
+    Conc(37,15) = Q(13)/l.V_liq*(X_I_in - X_I) + l.f_xI_xc*rho_1;                              % 24
     
     % Differential equations 25-26, cations and anions
-    d_S_cat_dt = l.q_in/l.V_liq*(l.S_cat_in - S_cat);                                           % 25
-    d_S_an_dt = l.q_in/l.V_liq*(l.S_an_in - S_an);                                              % 26
+    Conc(38,15) = Q(13)/l.V_liq*(S_cat_in - S_cat);                                            % 25
+    Conc(39,15) = Q(13)/l.V_liq*(S_an_in - S_an);                                              % 26
     
     % Differential equations 27-32, ion states
-    d_S_vam_dt = -rho_A_4;                                                                      % 27
-    d_S_bum_dt = -rho_A_5;                                                                      % 28
-    d_S_prom_dt= -rho_A_6;                                                                      % 29
-    d_S_acm_dt = -rho_A_7;                                                                      % 30
-    d_S_hco3m_dt = -rho_A_10;                                                                   % 31
-    d_S_nh3_dt = -rho_A_11;                                                                     % 32
+    Conc(40,15) = -rho_A_4;                                                                     % 27
+    Conc(41,15) = -rho_A_5;                                                                     % 28
+    Conc(42,15) = -rho_A_6;                                                                     % 29
+    Conc(43,15) = -rho_A_7;                                                                     % 30
+    Conc(44,15) = -rho_A_10;                                                                    % 31
+    Conc(45,15) = -rho_A_11;                                                                    % 32
     
     % Differential equations 33-35, gas phase equations
-    d_S_gas_h2_dt = -S_gas_h2*q_gas/l.V_gas + rho_T_8*l.V_liq/l.V_gas;                          % 33
-    d_S_gas_ch4_dt = -S_gas_ch4*q_gas/l.V_gas + rho_T_9*l.V_liq/l.V_gas;                        % 34
-    d_S_gas_co2_dt = -S_gas_co2*q_gas/l.V_gas + rho_T_10*l.V_liq/l.V_gas;                       % 35
+    Conc(46,14) = -S_gas_h2*q_gas/l.V_gas + rho_T_8*l.V_liq/l.V_gas;                            % 33
+    Conc(47,14) = -S_gas_ch4*q_gas/l.V_gas + rho_T_9*l.V_liq/l.V_gas;                           % 34
+    Conc(48,14) = -S_gas_co2*q_gas/l.V_gas + rho_T_10*l.V_liq/l.V_gas;                          % 35
     
 %% Conversion from ADM1 to ASM1
     % CONVERT UNITS CORRECTLY BACK TO ASM1
