@@ -64,7 +64,8 @@ Var.param = [0.67 0.24 0.08 0.08 ...
 l = SE_IndataADM1_v2;
 
 %% simulation time span (days)
-t = 1:0.1:2;
+%t = 1:0.1:29;
+t = 1:0.1:29;
 % Sample rate
     % Decrease sample rate for better DO control, but ODE takes longer
 sp = 1/5;
@@ -202,44 +203,61 @@ end
   
 %% ODE
 % Intialize variables for assignin
-VarConc_out = zeros(48,15); 
-PlantInflow_out = [];
-T_out = [];
-MCRT_out = [];
+%VarConc_out = zeros(48,15); 
+%PlantInflow_out = [];
+%T_out = [];
+%MCRT_out = [];
 % Optimize ODE solver
 %figure(1)
 %opts = odeset('MStateDependence','JPattern','Stats','on','OutputFcn',@odeplot);
 odefunc = @(t,x) MLE(t,x,Var,l);
 opts = odeset('MStateDependence','JPattern');
 ODE_sol = ode15s(odefunc,t,x,opts);
-
+toc
+ODEToc = toc;
 %% Results
+tic
 % Get the data for each stream from the column of Concentration, then
 % manipulate each array to be used for graphing
 
-VarConc_out(1:48,:) = []; % Delete dummy rows
+%VarConc_out(1:48,:) = []; % Delete dummy rows
 % Set first 13 rows to var then delete 
 % Set the next 35 rows to a different var then delete 
 % Reloop
-% [r,c] = VarConc_out;
-% r = r; % total rows
-% c = c;  % total columns
-% d = r; % rows in each data set 
-% n = 13;  % remove first n rows in each data set
-% A(mod(1:r,d)<=n & mod(1:r,d)>0,:) = [];
-
-Concentration = VarConc_out; 
-time = T_out;
+arrayManip = Array.mleArray;
+int_len = length(arrayManip);
+loop_len = int_len/48;
+Concentration = [];
+Conc_AD = [];
+i = 1;
+na_int = 1;
+na_end = na_int + 12;
+oa_int = na_end + 1;
+oa_end = na_end + 35;
+while i < (loop_len + 1)
+    Concentration = [Concentration;arrayManip(na_int:na_end,:)];
+    Conc_AD = [Conc_AD;arrayManip(oa_int:oa_end,:)];
+    na_int = oa_end + 1;
+    na_end = na_int + 12;
+    oa_int = na_end + 1;
+    oa_end = na_end + 35;
+    i = i + 1;
+end
+% Remove dummy AD columns
+Conc_AD(:,1:12) = []; 
+time = Array.tArray;
 j = 1;
 stream = [];
 [row,col] = size(Concentration);
+compASM = 13;
+compADM = 35;
 figure(2)
 % Plot results
-while j < (16+1)
-    if j < (col+1)
+while j < (17+1)
+    if j < (col - 1)
     rev = num2str(j);
-    stream.rev = reshape(Concentration(:,j),[15,length(time)])';
-    subplot(4,4,j);
+    stream.rev = reshape(Concentration(:,j),[compASM,length(time)])';
+    subplot(4,5,j);
     plot(time,stream.rev);
     title(['Stream ' rev])
     ylabel('Concentration, mg/L')
@@ -247,25 +265,25 @@ while j < (16+1)
     else
     end
     if j == 6
-        subplot(4,4,16)
+        subplot(4,5,16)
         plot(time,stream.rev(:,8))
         title('DO')
         ylabel('Concentration, mg/L')
         xlabel('Time, days')
     elseif j == 9
-        subplot(4,4,13)
+        subplot(4,5,14)
         plot(time,stream.rev(:,10))
         title('Effluent Ammonia')
         ylabel('Concentration, mg/L')
         xlabel('Time, days')
-        subplot(4,4,14)
+        subplot(4,5,15)
         plot(time,stream.rev(:,9))
         title('Effluent Nitrate/Nitrite')
         ylabel('Concentration, mg/L')
         xlabel('Time, days')
-    elseif j == 15
-        subplot(4,4,j)
-        plot(time,PlantInflow_out)
+    elseif j == 17
+        subplot(4,5,j)
+        plot(time,Array.Qarray)
         title('Plant flow')
         ylabel('Volumetric Flow, m3/day')
         xlabel('Time, days')
@@ -275,9 +293,62 @@ while j < (16+1)
     j = j + 1;
 end
 
+AD_14 = reshape(Conc_AD(:,2),[compADM,length(time)])';
+gasAD = AD_14(:,33:35);
+S_gas_h2 = gasAD(:,1);
+S_gas_ch4 = gasAD(:,2);
+S_gas_co2 = gasAD(:,3);
+
+P_gas_h2 = S_gas_h2*l.R*l.T_op/16;
+P_gas_ch4 = S_gas_ch4*l.R*l.T_op/64;
+P_gas_co2 = S_gas_co2*l.R*l.T_op;
+
+% Gas flow
+P_gas = P_gas_h2 + P_gas_ch4 + P_gas_co2 + l.p_gas_h2o; % Total gas pressure
+q_gas = l.k_p*(P_gas - l.P_atm).*P_gas/l.P_atm; % Total gas flow
+
+% Calculate gas component gas flow
+q_gas_h2 = P_gas_h2./P_gas.*q_gas;
+q_gas_ch4 = P_gas_ch4./P_gas.*q_gas;
+q_gas_co2 = P_gas_co2./P_gas.*q_gas;
+q_gas_h2o = l.p_gas_h2o./P_gas.*q_gas;
+
+k = 1;
+figure(3)
+while k < 4
+    if k == 1
+    revAD = num2str(k);
+    ADstream.revAD = reshape(Conc_AD(:,k),[compADM,length(time)])';
+    subplot(2,2,k);
+    plot(time,ADstream.revAD);
+    title(['Stream ' revAD])
+    ylabel('Concentration, kg/m3')
+    xlabel('Time, days')
+    elseif k == 2
+    subplot(2,2,k);
+    plot(time,gasAD);
+    title(['Stream ' 2])
+    ylabel('Concentration, kg/m3')
+    xlabel('Time, days')
+    else
+    revAD = num2str(k);
+    ADstream.revAD = reshape(Conc_AD(:,k),[compADM,length(time)])';
+    subplot(2,2,k);
+    plot(time,ADstream.revAD);
+    title(['Stream ' revAD])
+    ylabel('Concentration, kg/m3')
+    xlabel('Time, days')
+    end
+    k = k + 1;
+end
 toc
+resultsToc = toc;
+totalTime = ODEToc + resultsToc;
+print(totalTime)
+
 function [Conc] = MLE(t,dCdt,Var,l)
 persistent KLa
+persistent Array
 CompASM = 13;
 CompADM = 35;
 %% Dynamic flow
@@ -286,8 +357,8 @@ Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow 
 opts = optimoptions(@fsolve,'Algorithm', 'levenberg-marquardt');
 Qint = [20000 19000 100 60000 60000 60000 25000 17000 10000 10000 500 10000 600 0 600];
 [Q,~] = fsolve(@(Q) myfunc(Q,Qplant,Var),Qint,opts);
-assignin('base','PlantInflow',Q);
-evalin('base','PlantInflow_out = [PlantInflow_out;PlantInflow];');
+% assignin('base','PlantInflow',Q);
+% evalin('base','PlantInflow_out = [PlantInflow_out;PlantInflow];');
 function Qsolve = myfunc(Q,Qplant,Var)
 %% Solves flow balance for given plant flow, recycle/waste fractions, and clarifier splits
 % Q(1) = Plant influent
@@ -648,7 +719,7 @@ while i < (CompASM + 1)
         S_su_in = dCdt(2,13)*CODc - ReqCODs;
     else
         S_aa_in = dCdt(2,13)*CODc;
-        S_su_in = 0.000000001;
+        S_su_in = 0.00000000001;
     end
     
     %% Soluble Inert Organic Material
@@ -686,8 +757,8 @@ while i < (CompASM + 1)
         S_IN_in = dCdt(10,13)*Nc;
     else
         X_c_in = CODremain;
-        X_ch_in = 0;
-        X_li_in = 0;
+        X_ch_in = 0.0000000001; % Cant set to exactly zero
+        X_li_in = 0.0000000001; % Cant set to exactly zero
         S_IN_in = dCdt(10,13)*Nc + OrgNremain - X_c_in*l.N_xc;
     end
     % CODremain and TNKremain should be zero.
@@ -697,22 +768,22 @@ while i < (CompASM + 1)
     S_cat_in = S_IC_in + 0.035;
     S_an_in = S_IN_in;
     % Remaing influent components unaccounted for in the ASM/ADM conversion
-    S_fa_in = 0.0001;
-    S_va_in = 0.0001;
-    S_bu_in = 0.0001;
-    S_pro_in = 0.0001;
-    S_ac_in = 0.0001;
-    S_h2_in = 0.0001;
-    S_ch4_in = 0.0001;
-    X_xc_in = 0.0001;
-    X_pr_in = 0.0001;
-    X_su_in = 0.0001;
-    X_aa_in = 0.0001;
-    X_fa_in = 0.0001;
-    X_c4_in = 0.0001;
-    X_pro_in = 0.0001;
-    X_ac_in = 0.0001;
-    X_h2_in = 0.0001;
+    % Cant set to exactly zero
+    S_fa_in = 0.0000000001;
+    S_va_in = 0.0000000001;
+    S_bu_in = 0.0000000001;
+    S_pro_in = 0.0000000001;
+    S_ac_in = 0.0000000001;
+    S_h2_in = 0.0000000001;
+    S_ch4_in = 0.0000000001;
+    X_pr_in = 0.0000000001;
+    X_su_in = 0.0000000001;
+    X_aa_in = 0.0000000001;
+    X_fa_in = 0.0000000001;
+    X_c4_in = 0.0000000001;
+    X_pro_in = 0.0000000001;
+    X_ac_in = 0.0000000001;
+    X_h2_in = 0.0000000001;
 %% AD differential equations
 % Data/Equations pulled from Aspects on ADM1 implementation within the BSM2 framework
 % CHECK PARAMETERS -> CHANGE VOLUMES (headspace/liquid)
@@ -857,64 +928,64 @@ while i < (CompASM + 1)
     
     %Differential equations 1-4, soluble matter
                                                                                                 % State No.
-    Conc(14,15) = Q(13)/l.V_liq*(S_su_in - S_su) + rho_2 + (1 - l.f_fa_li)*rho_4 - rho_5;      % 1
-    Conc(15,15) = Q(13)/l.V_liq*(S_aa_in - S_aa) + rho_3 - rho_6;                              % 2
-    Conc(16,15) = Q(13)/l.V_liq*(S_fa_in - S_fa) + l.f_fa_li*rho_4 - rho_7;                    % 3
-    Conc(17,15) = Q(13)/l.V_liq*(S_va_in - S_va) + (1 - l.Y_aa)*l.f_va_aa*rho_6 - rho_8;       % 4
+    Conc(14,15) = Q(13)/l.V_liq*(S_su_in - S_su) + rho_2 + (1 - l.f_fa_li)*rho_4 - rho_5;       % 1
+    Conc(15,15) = Q(13)/l.V_liq*(S_aa_in - S_aa) + rho_3 - rho_6;                               % 2
+    Conc(16,15) = Q(13)/l.V_liq*(S_fa_in - S_fa) + l.f_fa_li*rho_4 - rho_7;                     % 3
+    Conc(17,15) = Q(13)/l.V_liq*(S_va_in - S_va) + (1 - l.Y_aa)*l.f_va_aa*rho_6 - rho_8;        % 4
     
     % Differential equations 5-8, soluble matter
-    Conc(18,15) = Q(13)/l.V_liq*(S_bu_in - S_bu) + (1 - l.Y_su)*l.f_bu_su*rho_5 + ...          % 5
+    Conc(18,15) = Q(13)/l.V_liq*(S_bu_in - S_bu) + (1 - l.Y_su)*l.f_bu_su*rho_5 + ...           % 5
     (1 - l.Y_aa)*l.f_bu_aa*rho_6 - rho_9; 
-    Conc(19,15) = Q(13)/l.V_liq*(S_pro_in-S_pro) + (1 - l.Y_su)*l.f_pro_su*rho_5 + ...         % 6 
+    Conc(19,15) = Q(13)/l.V_liq*(S_pro_in-S_pro) + (1 - l.Y_su)*l.f_pro_su*rho_5 + ...          % 6 
     (1 - l.Y_aa)*l.f_pro_aa*rho_6 + (1-l.Y_c4)*0.54*rho_8 - rho_10;
-    Conc(20,15) = Q(13)/l.V_liq*(S_ac_in-S_ac) + (1 - l.Y_su)*l.f_ac_su*rho_5 + ...            % 7
+    Conc(20,15) = Q(13)/l.V_liq*(S_ac_in-S_ac) + (1 - l.Y_su)*l.f_ac_su*rho_5 + ...             % 7
     (1 - l.Y_aa)*l.f_ac_aa*rho_6 + (1 - l.Y_fa)*0.7*rho_7 + ... 
     (1 - l.Y_c4)*0.31*rho_8 + (1-l.Y_c4)*0.8*rho_9 + ... 
     (1 - l.Y_pro)*0.57*rho_10 - rho_11;
-    Conc(21,15) = Q(13)/l.V_liq*(S_h2_in - S_h2) + (1 - l.Y_su)*l.f_h2_su*rho_5 + ...          % 8
+    Conc(21,15) = Q(13)/l.V_liq*(S_h2_in - S_h2) + (1 - l.Y_su)*l.f_h2_su*rho_5 + ...           % 8
     (1 - l.Y_aa)*l.f_h2_aa*rho_6 + (1 - l.Y_fa)*0.3*rho_7 + ... 
     (1 - l.Y_c4)*0.15*rho_8 + (1 - l.Y_c4)*0.2*rho_9 + ... 
     (1 - l.Y_pro)*0.43*rho_10 - rho_12 - rho_T_8;
 
     % Differential equations 9-12, soluble matter (added IC and IN?terms for new prep.)
-    Conc(22,15) = Q(13)/l.V_liq*(S_ch4_in - S_ch4) + (1 - l.Y_ac)*rho_11 + ...                 % 9
+    Conc(22,15) = Q(13)/l.V_liq*(S_ch4_in - S_ch4) + (1 - l.Y_ac)*rho_11 + ...                  % 9
     (1 - l.Y_h2)*rho_12 - rho_T_9; 
-    Conc(23,15) = Q(13)/l.V_liq*(S_IC_in - S_IC) - (s_1*rho_1 + s_2*rho_2 + ...                % 10
+    Conc(23,15) = Q(13)/l.V_liq*(S_IC_in - S_IC) - (s_1*rho_1 + s_2*rho_2 + ...                 % 10
     s_3*rho_3 + s_4*rho_4 + s_5*rho_5 + s_6*rho_6 + s_7*rho_7 + ... 
     s_8*rho_8 + s_9*rho_9 + s_10*rho_10 + s_11*rho_11 + s_12*rho_12 + ... 
     s_13*(rho_13 + rho_14 + rho_15 + rho_16... 
     + rho_17 + rho_18 + rho_19)) - rho_T_10; 
-    Conc(24,15) = Q(13)/l.V_liq*(S_IN_in - S_IN) - l.Y_su*l.N_bac*rho_5 + ...                  % 11
+    Conc(24,15) = Q(13)/l.V_liq*(S_IN_in - S_IN) - l.Y_su*l.N_bac*rho_5 + ...                   % 11
     (l.N_aa - l.Y_aa*l.N_bac)*rho_6 - l.Y_fa*l.N_bac*rho_7 - ... 
     l.Y_c4*l.N_bac*rho_8 - l.Y_c4*l.N_bac*rho_9 - ... 
     l.Y_pro*l.N_bac*rho_10 - l.Y_ac*l.N_bac*rho_11 - ... 
     l.Y_h2*l.N_bac*rho_12 + (l.N_bac - l.N_xc)*... 
     (rho_13 + rho_14 + rho_15 + rho_16 + rho_17 + rho_18 +... 
     rho_19) + (l.N_xc - l.f_xI_xc*l.N_I - l.f_sI_xc*l.N_I - l.f_pr_xc*l.N_aa)*rho_1; 
-    Conc(25,15) = Q(13)/l.V_liq*(S_I_in - S_I) + l.f_sI_xc*rho_1;                              % 12
+    Conc(25,15) = Q(13)/l.V_liq*(S_I_in - S_I) + l.f_sI_xc*rho_1;                               % 12
     
     % Differential equations 13-16, particulate matter
-    Conc(26,15) = Q(13)/l.V_liq*(X_xc_in - X_c) - rho_1 + ...                                  % 13
+    Conc(26,15) = Q(13)/l.V_liq*(X_c_in - X_c) - rho_1 + ...                                   % 13
     rho_13 + rho_14 + rho_15 + rho_16 + rho_17 + rho_18 + rho_19; 
-    Conc(27,15) = Q(13)/l.V_liq*(X_ch_in - X_ch) + l.f_ch_xc*rho_1 - rho_2;                    % 14
-    Conc(28,15) = Q(13)/l.V_liq*(X_pr_in - X_pr) + l.f_pr_xc*rho_1 - rho_3;                    % 15
-    Conc(29,15) = Q(13)/l.V_liq*(X_li_in - X_li) + l.f_li_xc*rho_1 - rho_4;                    % 16
+    Conc(27,15) = Q(13)/l.V_liq*(X_ch_in - X_ch) + l.f_ch_xc*rho_1 - rho_2;                     % 14
+    Conc(28,15) = Q(13)/l.V_liq*(X_pr_in - X_pr) + l.f_pr_xc*rho_1 - rho_3;                     % 15
+    Conc(29,15) = Q(13)/l.V_liq*(X_li_in - X_li) + l.f_li_xc*rho_1 - rho_4;                     % 16
     
     % Differential equations 17-20, particulate matter
-    Conc(30,15) = Q(13)/l.V_liq*(X_su_in - X_su) + l.Y_su*rho_5 - rho_13;                      % 17
-    Conc(31,15) = Q(13)/l.V_liq*(X_aa_in - X_aa) + l.Y_aa*rho_6 - rho_14;                      % 18
-    Conc(32,15) = Q(13)/l.V_liq*(X_fa_in - X_fa) + l.Y_fa*rho_7 - rho_15;                      % 19
-    Conc(33,15)  = Q(13)/l.V_liq*(X_c4_in - X_c4) + l.Y_c4*rho_8 + l.Y_c4*rho_9 - rho_16;      % 20
+    Conc(30,15) = Q(13)/l.V_liq*(X_su_in - X_su) + l.Y_su*rho_5 - rho_13;                       % 17
+    Conc(31,15) = Q(13)/l.V_liq*(X_aa_in - X_aa) + l.Y_aa*rho_6 - rho_14;                       % 18
+    Conc(32,15) = Q(13)/l.V_liq*(X_fa_in - X_fa) + l.Y_fa*rho_7 - rho_15;                       % 19
+    Conc(33,15)  = Q(13)/l.V_liq*(X_c4_in - X_c4) + l.Y_c4*rho_8 + l.Y_c4*rho_9 - rho_16;       % 20
     
     % Differential equations 21-24, particulate matter
-    Conc(34,15) = Q(13)/l.V_liq*(X_pro_in - X_pro) + l.Y_pro*rho_10 - rho_17;                  % 21
-    Conc(35,15) = Q(13)/l.V_liq*(X_ac_in - X_ac) + l.Y_ac*rho_11 - rho_18;                     % 22
-    Conc(36,15) = Q(13)/l.V_liq*(X_h2_in - X_h2) + l.Y_h2*rho_12 - rho_19;                     % 23
-    Conc(37,15) = Q(13)/l.V_liq*(X_I_in - X_I) + l.f_xI_xc*rho_1;                              % 24
+    Conc(34,15) = Q(13)/l.V_liq*(X_pro_in - X_pro) + l.Y_pro*rho_10 - rho_17;                   % 21
+    Conc(35,15) = Q(13)/l.V_liq*(X_ac_in - X_ac) + l.Y_ac*rho_11 - rho_18;                      % 22
+    Conc(36,15) = Q(13)/l.V_liq*(X_h2_in - X_h2) + l.Y_h2*rho_12 - rho_19;                      % 23
+    Conc(37,15) = Q(13)/l.V_liq*(X_I_in - X_I) + l.f_xI_xc*rho_1;                               % 24
     
     % Differential equations 25-26, cations and anions
-    Conc(38,15) = Q(13)/l.V_liq*(S_cat_in - S_cat);                                            % 25
-    Conc(39,15) = Q(13)/l.V_liq*(S_an_in - S_an);                                              % 26
+    Conc(38,15) = Q(13)/l.V_liq*(S_cat_in - S_cat);                                             % 25
+    Conc(39,15) = Q(13)/l.V_liq*(S_an_in - S_an);                                               % 26
     
     % Differential equations 27-32, ion states
     Conc(40,15) = -rho_A_4;                                                                     % 27
@@ -955,9 +1026,22 @@ Conc = reshape(Conc,[vec_len,1]);
 % Due to Conc only changing in the reactors, dCdt variable needs to be
 % saved and sent to the workspace.
 
+% At time = 1, dont store variable into structure
+if t == 1
+    Array.mleArray = dCdt;
+    Array.tArray = t;
+    Array.Qarray = Q;
+else
+end
+% Append the new variables to the structure each "time" step of ODE solver
+Array.mleArray = [Array.mleArray;dCdt];
+Array.tArray = [Array.tArray;t];
+Array.Qarray = [Array.Qarray;Q];
+assignin('base','Array',Array);
+
 fprintf('Current simulation time is %6.6f days\n',t)
-assignin('base','VarConc',dCdt);
-evalin('base','VarConc_out = [VarConc_out;VarConc];');
-assignin('base','T_step',t);
-evalin('base','T_out(end+1) = T_step;');
+% assignin('base','VarConc',dCdt);
+% evalin('base','VarConc_out = [VarConc_out;VarConc];');
+% assignin('base','T_step',t);
+% evalin('base','T_out(end+1) = T_step;');
 end
