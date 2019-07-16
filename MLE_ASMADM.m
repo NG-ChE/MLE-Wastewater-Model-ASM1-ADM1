@@ -1,19 +1,12 @@
 tic
 %% TO-DO
-% Construct new set of streams for (Q) and components for (x) that pertain to the
-% addition of 3 streams (1 into AD and 2 out) and 35 components
 % Adjust initial values for each stream throughout the entire plant
 % Rename streams to actual processes
-
 % Convert ASM values to ADM
     % UNITS NEED TO BE ADJUSTED
     % Essentially done
     % Need to verify and find missing variables
     
-% Implement ODE/system equations for ADM1
-    % d_1_code,IndataADM1_v2,ADM1_fun_v2_ODE
-    % Pass in a structure for intial conditions, one for MLE and other for AD
-        % Not possible -> need a different strategy
 % Implement thickener(before AD)/dewatering(after AD)/dryer(after AD)
 % Implement denitrification filter
 
@@ -64,12 +57,15 @@ Var.param = [0.67 0.24 0.08 0.08 ...
 l = SE_IndataADM1_v2;
 
 %% simulation time span (days)
-%t = 1:0.1:29;
+% Increase timespan interval for more data points in result section, can
+% signicantly reduce time if interval is very small
 t = 1:0.1:29;
 % Sample rate
     % Decrease sample rate for better DO control, but ODE takes longer
 sp = 1/5;
 Var.tsample = t + sp*t;
+Var.timespan = t;
+
 
 %% Convert typical units coming into plant to ASM1 variables
 % % Units g/m3 = mg/L
@@ -215,14 +211,14 @@ opts = odeset('MStateDependence','JPattern');
 ODE_sol = ode15s(odefunc,t,x,opts);
 toc
 ODEToc = toc;
+
 %% Results
 tic
+disp('Manipulating large data set, be patient')
 % Get the data for each stream from the column of Concentration, then
 % manipulate each array to be used for graphing
-
-%VarConc_out(1:48,:) = []; % Delete dummy rows
-% Set first 13 rows to var then delete 
-% Set the next 35 rows to a different var then delete 
+% Set first 13 rows to Concentration (ASM1 variables) 
+% Set the next 35 rows to Conc_AD (ADM1 variables)
 % Reloop
 arrayManip = Array.mleArray;
 int_len = length(arrayManip);
@@ -244,17 +240,111 @@ while i < (loop_len + 1)
     i = i + 1;
 end
 % Remove dummy AD columns
-Conc_AD(:,1:12) = []; 
+Conc_AD(:,1:12) = [];
+% Set variables
 time = Array.tArray;
-j = 1;
-stream = [];
 [row,col] = size(Concentration);
 compASM = 13;
 compADM = 35;
+
+%% Carbon content fractions
+% Fractions taken from B&V study
+C_S_I = 0.32; % C content of soluble inert material (Si) [gC/gCOD]
+C_I_P = 0.32; % C content of inert particulate material (Xi) [gC/gCOD]
+C_SB_S = 0.32; % C content of slowly biodegradable substrate (Xs) [gC/gCOD]
+C_S_S = 0.32; % C content of soluble substrate (Ss) [gC/gCOD]
+C_C = 0.32; % C content of colloidal material [gC/gCOD]
+C_A = 0.375; % C content of acetate [gC/gCOD]
+C_P = 0.321; % C content of propionate [gC/gCOD]
+C_M = 0.25; % C content of methanol [gC/gCOD]
+C_S_M = 0.188; % C content of soluble methane [gC/gCOD]
+C_CO2 =  0.273; % C content of carbon dioxide [gC/gCO2]
+C_CC = 0.12; % C content of calcium carbonate (Salk) [gC/gCaCO3]
+C_HB = 0.366; % C content of heterotrophic biomass (Xbh) [gC/gCOD]
+C_AOB = 0.366; % C content of ammonia-oxidizing biomass [gC/gCOD]
+C_NOB = 0.366; % C content of nitrite-oxidizing biomass [gC/gCOD]
+% AOB/NOB are autotrophic biomass
+C_AB = 0.366; % C content of autotrophic biomass (Xba) [gC/gCOD]
+C_UB = 0.366; % C content of unbiodegradable residue (Xp) [gC/gCOD]
+
+%% Carbon (grams) in system
+% Create arrays for carbon
+% Each carbon component relates to a component in the ASM1 Concentration
+% data set, which will later be multipled by the carbon content fraction
+CSI = 1; Carbon.CSI= [];
+CSS = 2; Carbon.CSS = [];
+CIP = 3; Carbon.CIP = [];
+CSBS = 4; Carbon.CSBS = [];
+CHB = 5; Carbon.CHB = [];
+CAB = 6; Carbon.CAB = [];
+CUB = 7; Carbon.CUB = [];
+CCC = 13; Carbon.CCC = [];
+p = 1;
+while p < (length(Concentration) + 1)
+    Carbon.CSI = [Carbon.CSI;Concentration(CSI,:)];
+    Carbon.CSS = [Carbon.CSS;Concentration(CSS,:)];
+    Carbon.CIP = [Carbon.CIP;Concentration(CIP,:)];
+    Carbon.CSBS = [Carbon.CSBS;Concentration(CSBS,:)];
+    Carbon.CHB= [Carbon.CHB;Concentration(CHB,:)];
+    Carbon.CAB = [Carbon.CAB;Concentration(CAB,:)];
+    Carbon.CUB = [Carbon.CUB;Concentration(CUB,:)];
+    Carbon.CCC = [Carbon.CCC;Concentration(CCC,:)];
+    CSI = CCC + 1;
+    CSS = CCC + 2;
+    CIP = CCC + 3;
+    CSBS = CCC + 4;
+    CHB = CCC + 5;
+    CAB = CCC + 6;
+    CUB = CCC + 7;
+    CCC = CCC + 13;
+    p = p + 1;
+end 
+% Convert concentration to mass/time 
+Carbon.CSIgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CSIgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CSSgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CIPgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CSBSgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CHBgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CABgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CUBgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CCCgrams = Carbon.CSI.*Array.Qarray;
+
+% Determine total carbon mass flow rate [gC/day] in stream m
+% Multiply carbon fraction by the corresponding carbon component
+% Methane, methanol, and CO2 still need to be implemented
+m = 1;
+C = [];
+if m < (col + 1)
+    C(:,m) = Carbon.CSIgrams(:,m).*C_S_I + Carbon.CIPgrams(:,m).*C_I_P + Carbon.CSBSgrams(:,m).*C_SB_S +... 
+    Carbon.CSSgrams(:,m).*C_S_S + Carbon.CCCgrams(:,m).*C_CC+ Carbon.CHBgrams(:,m).*C_HB + Carbon.CABgrams(:,m).*C_AB +...
+    Carbon.CUBgrams(:,m).*C_UB;
+    m = m + 1;
+end
+% Mass balance check
+error(:,1) = C(:,1) - (C(:,2) + C(:,3));
+error(:,2) = C(:,4) - (C(:,12) + C(:,8)+ C(:,2));
+error(:,3) = C(:,4) - C(:,5);
+error(:,4) = C(:,5) - C(:,6);
+error(:,5) = C(:,6) - (C(:,8) + C(:,7));
+error(:,6) = C(:,7) - (C(:,9) + C(:,10));
+error(:,7) = C(:,10) - (C(:,12) + C(:,11));
+error(:,8) = C(:,1) - (C(:,11) + C(:,9) + C(:,3));
+error(:,9) = C(:,13) - (C(:,11) + C(:,3));
+error(:,10) = C(:,15) - C(:,15);
+% Plot error and Carbon flow
+figure(1)
+plot(time,error)
 figure(2)
+plot(time,C)
+
+%% Plotting separate results
+j = 1;
+stream = [];
+figure(3)
 % Plot results
 while j < (17+1)
-    if j < (col - 1)
+    if j < (col + 1)
     rev = num2str(j);
     stream.rev = reshape(Concentration(:,j),[compASM,length(time)])';
     subplot(4,5,j);
@@ -271,17 +361,17 @@ while j < (17+1)
         ylabel('Concentration, mg/L')
         xlabel('Time, days')
     elseif j == 9
-        subplot(4,5,14)
+        subplot(4,5,17)
         plot(time,stream.rev(:,10))
         title('Effluent Ammonia')
         ylabel('Concentration, mg/L')
         xlabel('Time, days')
-        subplot(4,5,15)
+        subplot(4,5,18)
         plot(time,stream.rev(:,9))
         title('Effluent Nitrate/Nitrite')
         ylabel('Concentration, mg/L')
         xlabel('Time, days')
-    elseif j == 17
+    elseif j == 19
         subplot(4,5,j)
         plot(time,Array.Qarray)
         title('Plant flow')
@@ -313,8 +403,9 @@ q_gas_ch4 = P_gas_ch4./P_gas.*q_gas;
 q_gas_co2 = P_gas_co2./P_gas.*q_gas;
 q_gas_h2o = l.p_gas_h2o./P_gas.*q_gas;
 
+
 k = 1;
-figure(3)
+figure(4)
 while k < 4
     if k == 1
     revAD = num2str(k);
@@ -344,7 +435,7 @@ end
 toc
 resultsToc = toc;
 totalTime = ODEToc + resultsToc;
-print(totalTime)
+fprintf('The total elapsed time is %.2f minutes',(totalTime/60))
 
 function [Conc] = MLE(t,dCdt,Var,l)
 persistent KLa
@@ -622,18 +713,13 @@ while i < (CompASM + 1)
 %% Conversion from ASM1 to ADM1
     % Using paper: TOWARDS AN ASM1 - ADM1 STATE VARIABLE INTERFACE FOR
     % PLANT-WIDE WASTEWATER TREATMENT MODELING
-    %
-    % ALL VALUES NEED TO BE CONVERTED STILL
-    % Not executable yet
-    % Add new streams into Q and initial conditions
-    % COD demand
     %% Waste sludge mixing
     dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13);
     
     %% Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
     CODc = 1/1000; % Convert COD ASM1 variables to ADM1 -> g to kg
     Nc = 1/14/1000; % Convert g N to kmol of N
-    % Assuming alkilinity is calcium carbonate for C conversion
+    % Assuming alkalinity is calcium carbonate for C conversion
     Alkc = (0.001/1000)*(12/(12 + 16*3 + 40.078)); % Convert mol/L of Alkalinity to kmol-C/m3
     CODdemand = dCdt(8,13) + 2.86*dCdt(9,13);
 %     if CODdemand < (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
@@ -713,7 +799,7 @@ while i < (CompASM + 1)
         CODdemand = - dCdt(6,13);
     end
     %% Soluble Organic Nitrogen
-    ReqCODs = (dCdt(11,13)*Nc)/l.N_aa; % Naa is nitrogen fraction of the amino acid state variable, Saa
+    ReqCODs = (dCdt(11,13)*Nc)/l.N_aa;
     if dCdt(2,13)*CODc > ReqCODs
         S_aa_in = ReqCODs;
         S_su_in = dCdt(2,13)*CODc - ReqCODs;
@@ -784,6 +870,44 @@ while i < (CompASM + 1)
     X_pro_in = 0.0000000001;
     X_ac_in = 0.0000000001;
     X_h2_in = 0.0000000001;
+    % Save to concentration
+    dCdt(14,13) = S_su_in;
+    dCdt(15,13) = S_aa_in;
+    dCdt(16,13) = S_fa_in;
+    dCdt(17,13) = S_va_in;
+    dCdt(18,13) = S_bu_in;
+    dCdt(19,13) = S_pro_in;
+    dCdt(20,13) = S_ac_in;
+    dCdt(21,13) = S_h2_in;
+    dCdt(22,13) = S_ch4_in;
+    dCdt(23,13) = S_IC_in;
+    dCdt(24,13) = S_IN_in;
+    dCdt(25,13) = S_I_in;
+    dCdt(26,13) = X_c_in;
+    dCdt(27,13) = X_ch_in;
+    dCdt(28,13) = X_pr_in;
+    dCdt(29,13) = X_li_in;
+    dCdt(30,13) = X_su_in;
+    dCdt(31,13) = X_aa_in;
+    dCdt(32,13) = X_fa_in;
+    dCdt(33,13) = X_c4_in;
+    dCdt(34,13) = X_pro_in;
+    dCdt(35,13) = X_ac_in;
+    dCdt(36,13) = X_h2_in;
+    dCdt(37,13) = X_I_in;
+    dCdt(38,13) = S_cat_in;
+    dCdt(39,13) = S_an_in;
+    % Non-incoming variables
+%     S_vam = dCdt(40,13);
+%     S_bum = dCdt(41,13);
+%     S_prom = dCdt(42,13);
+%     S_acm = dCdt(43,13);
+%     S_hco3m = dCdt(44,13);
+%     S_nh3_in = dCdt(45,13);
+%     S_gas_h2 = dCdt(46,13);
+%     S_gas_ch4 = dCdt(47,13);
+%     S_gas_co2 = dCdt(48,13);
+    
 %% AD differential equations
 % Data/Equations pulled from Aspects on ADM1 implementation within the BSM2 framework
 % CHECK PARAMETERS -> CHANGE VOLUMES (headspace/liquid)
@@ -861,7 +985,7 @@ while i < (CompASM + 1)
     I_pH_h2 = 1;
     end
     
-    %Process inhibition
+    % Process inhibition
     I_IN_lim = 1/(1 + l.K_S_IN/S_IN);
     I_h2_fa = 1/(1 + S_h2/l.K_I_h2_fa);
     I_h2_c4 = 1/(1 + S_h2/l.K_I_h2_c4);
@@ -876,7 +1000,7 @@ while i < (CompASM + 1)
     I_11 = I_pH_ac*I_IN_lim*I_nh3;
     I_12 = I_pH_h2*I_IN_lim;
     
-    %Biochemical process rates
+    % Biochemical process rates
     rho_1 = l.k_dis*X_c;
     rho_2 = l.k_hyd_ch*X_ch;
     rho_3 = l.k_hyd_pr*X_pr;
@@ -897,7 +1021,7 @@ while i < (CompASM + 1)
     rho_18 = l.k_dec_X_ac*X_ac;
     rho_19 = l.k_dec_X_h2*X_h2;
     
-    %Acid/base rates
+    % Acid/base rates
     rho_A_4 = l.k_A_B_va*(S_vam*(l.K_a_va + Sh) - l.K_a_va*S_va);
     rho_A_5 = l.k_A_B_bu*(S_bum*(l.K_a_bu + Sh) - l.K_a_bu*S_bu);
     rho_A_6 = l.k_A_B_pro*(S_prom*(l.K_a_pro + Sh) - l.K_a_pro*S_pro);
@@ -926,7 +1050,7 @@ while i < (CompASM + 1)
     s_12 = (1 - l.Y_h2)*l.C_ch4 + l.Y_h2*l.C_bac;
     s_13 = -l.C_bac + l.C_xc;
     
-    %Differential equations 1-4, soluble matter
+    % Differential equations 1-4, soluble matter
                                                                                                 % State No.
     Conc(14,15) = Q(13)/l.V_liq*(S_su_in - S_su) + rho_2 + (1 - l.f_fa_li)*rho_4 - rho_5;       % 1
     Conc(15,15) = Q(13)/l.V_liq*(S_aa_in - S_aa) + rho_3 - rho_6;                               % 2
@@ -936,18 +1060,18 @@ while i < (CompASM + 1)
     % Differential equations 5-8, soluble matter
     Conc(18,15) = Q(13)/l.V_liq*(S_bu_in - S_bu) + (1 - l.Y_su)*l.f_bu_su*rho_5 + ...           % 5
     (1 - l.Y_aa)*l.f_bu_aa*rho_6 - rho_9; 
-    Conc(19,15) = Q(13)/l.V_liq*(S_pro_in-S_pro) + (1 - l.Y_su)*l.f_pro_su*rho_5 + ...          % 6 
+    Conc(19,15) = Q(13)/l.V_liq*(S_pro_in - S_pro) + (1 - l.Y_su)*l.f_pro_su*rho_5 + ...          % 6 
     (1 - l.Y_aa)*l.f_pro_aa*rho_6 + (1-l.Y_c4)*0.54*rho_8 - rho_10;
-    Conc(20,15) = Q(13)/l.V_liq*(S_ac_in-S_ac) + (1 - l.Y_su)*l.f_ac_su*rho_5 + ...             % 7
+    Conc(20,15) = Q(13)/l.V_liq*(S_ac_in - S_ac) + (1 - l.Y_su)*l.f_ac_su*rho_5 + ...             % 7
     (1 - l.Y_aa)*l.f_ac_aa*rho_6 + (1 - l.Y_fa)*0.7*rho_7 + ... 
-    (1 - l.Y_c4)*0.31*rho_8 + (1-l.Y_c4)*0.8*rho_9 + ... 
+    (1 - l.Y_c4)*0.31*rho_8 + (1 - l.Y_c4)*0.8*rho_9 + ... 
     (1 - l.Y_pro)*0.57*rho_10 - rho_11;
     Conc(21,15) = Q(13)/l.V_liq*(S_h2_in - S_h2) + (1 - l.Y_su)*l.f_h2_su*rho_5 + ...           % 8
     (1 - l.Y_aa)*l.f_h2_aa*rho_6 + (1 - l.Y_fa)*0.3*rho_7 + ... 
     (1 - l.Y_c4)*0.15*rho_8 + (1 - l.Y_c4)*0.2*rho_9 + ... 
     (1 - l.Y_pro)*0.43*rho_10 - rho_12 - rho_T_8;
 
-    % Differential equations 9-12, soluble matter (added IC and IN?terms for new prep.)
+    % Differential equations 9-12, soluble matter
     Conc(22,15) = Q(13)/l.V_liq*(S_ch4_in - S_ch4) + (1 - l.Y_ac)*rho_11 + ...                  % 9
     (1 - l.Y_h2)*rho_12 - rho_T_9; 
     Conc(23,15) = Q(13)/l.V_liq*(S_IC_in - S_IC) - (s_1*rho_1 + s_2*rho_2 + ...                 % 10
@@ -1012,7 +1136,7 @@ while i < (CompASM + 1)
     dCdt(10,15) = S_IN/Nc;
     dCdt(11,15) = (S_I*l.N_I + S_aa*l.N_aa)/Nc;
     % Ixe is unknown, make it same as ixb
-    ixe = ixb;
+    ixe = ixb/1000; % gN/gCOD -> kgN/kgCOD
     dCdt(12,15) = (l.N_bac*(X_su + X_aa + X_fa + X_c4 + X_pro + X_ac + X_h2) + l.N_I*X_I + l.N_xc*X_c + l.N_aa*X_pr - ixe*X_I)/Nc;
     dCdt(5,15) = 0;
     dCdt(6,15) = 0;
@@ -1024,24 +1148,25 @@ end
 vec_len = numel(Conc);
 Conc = reshape(Conc,[vec_len,1]);
 % Due to Conc only changing in the reactors, dCdt variable needs to be
-% saved and sent to the workspace.
+% saved and sent to the workspace as it used throughout the code to keep track of components
 
 % At time = 1, dont store variable into structure
 if t == 1
     Array.mleArray = dCdt;
     Array.tArray = t;
     Array.Qarray = Q;
+elseif t >= 1.05
+    % Avoid large dataset and quicken solver time by only aquiring data at the specified time span
+    adjT = round(t*100)/100;
+    findT = find(adjT == Var.timespan);
+    if numel(findT) > 0
+        Array.mleArray = [Array.mleArray;dCdt];
+        Array.tArray = [Array.tArray;t];
+        Array.Qarray = [Array.Qarray;Q];
+        assignin('base','Array',Array);
+    else
+    end
 else
 end
-% Append the new variables to the structure each "time" step of ODE solver
-Array.mleArray = [Array.mleArray;dCdt];
-Array.tArray = [Array.tArray;t];
-Array.Qarray = [Array.Qarray;Q];
-assignin('base','Array',Array);
-
 fprintf('Current simulation time is %6.6f days\n',t)
-% assignin('base','VarConc',dCdt);
-% evalin('base','VarConc_out = [VarConc_out;VarConc];');
-% assignin('base','T_step',t);
-% evalin('base','T_out(end+1) = T_step;');
 end
