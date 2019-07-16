@@ -14,6 +14,7 @@ tic
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
+% AD isn't working properly
 % ***** CHECK UNITS *****
 
 clc
@@ -128,53 +129,55 @@ Xndo = 5; % Particulate biodegradable organic nitrogen
 Salko = 7; % Alkalinity
 MLE_int = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko]; % Create vector of initial values for the MLE system
 AD_int = [0.009;... % S_su
-0.0009;... % S_aa
-0.0009;... % S_faD.1. 
-0.0009;... % S_va
-0.0009;... % S_bu
-0.0009;... % S_pro
-0.0009;... % S_ac
-2.3594e-9;...%S_h2
-2.3594e-6;...%S_ch4
-0.039;... %S_IC
-0.13023;... %S_IN
-0.009;... %S_I
-0.30870;... %X_c
-0.02795;... %X_ch
-0.10260;... %X_pr
-0.02948; ... %X_li
-0.42016;... %X_su
-1.17917;... %X_aa
-0.24303;... %X_fa
-0.43192;... %X_c4
-0.13730;... %X_pro
-0.76056;... %X_ac
-0.31702;... %X_h2
-25.61739;... %X_I
-0.04;... %S_cat
-0.02;... %S_an
-0.0116;... %S_vam
-0.01322;... %S_bum
-0.01574;... %S_prom
-0.19724;... %S_acm
-0.14278;... %S_hco3m
-0.00409;... %S_nh3
-1.023e-5;... %h2
-1.62125;... %ch4
-0.01411]'; %co2
-sys_int = [MLE_int AD_int]; % Intial conditions for AD (comp 14-48) are unnessary as they will be overwritten in the main file and parsed out after
-x = sys_int(:)*ones(1,15); % Format to an array of [components,streams] -> maybe send to ODE function to allow the initial conditions to be adjusted for added streams
+0.0009;...          % S_aa
+0.0009;...          % S_fa 
+0.0009;...          % S_va
+0.0009;...          % S_bu
+0.0009;...          % S_pro
+0.0009;...          % S_ac
+2.3594e-9;...       % S_h2
+2.3594e-6;...       % S_ch4
+0.039;...           % S_IC
+0.13023;...         % S_IN
+0.009;...           % S_I
+0.30870;...         % X_c
+0.02795;...         % X_ch
+0.10260;...         % X_pr
+0.02948; ...        % X_li
+0.42016;...         % X_su
+1.17917;...         % X_aa
+0.24303;...         % X_fa
+0.43192;...         % X_c4
+0.13730;...         % X_pro
+0.76056;...         % X_ac
+0.31702;...         % X_h2
+25.61739;...        % X_I
+0.04;...            % S_cat
+0.02;...            % S_an
+0.0116;...          % S_vam
+0.01322;...         % S_bum
+0.01574;...         % S_prom
+0.19724;...         % S_acm
+0.14278;...         % S_hco3m
+0.00409;...         % S_nh3
+1.023e-5;...        % h2
+1.62125;...         % ch4
+0.01411]';          % co2
+sys_int = [MLE_int AD_int]; % Combine initial conditions
+x = sys_int(:)*ones(1,15); % Format to an array of [components,streams]
 
 %% Import data for varying influent flow
 dat_dry=importdata('datos/Inf_dry_2006.txt','\t',1);
 dat_rain=importdata('datos/Inf_rain_2006.txt','\t',1);
 dat_strm=importdata('datos/Inf_strm_2006.txt','\t',1);
+
 % Append data
 drydata = dat_dry.data;
 stormdata = dat_strm.data;
 stormdata(:,1) = stormdata(:,1) + drydata(end,1);
 InfluentData = [drydata;stormdata];
-DataTime = InfluentData(:,1); % Time
+DataTime = InfluentData(:,1);
+
 % Manipulate data for ODE input
 Var.Qt = InfluentData(:,1); % Time, days
 Var.Ct = Var.Qt; % Time, days
@@ -182,6 +185,7 @@ InfluentData(:,1) = []; % Remove column of time data
 Var.Qflow = InfluentData(:,14); % Flow at time, Qt
 InfluentData(:,14) = []; % Remove column of influent flow data
 Var.C = InfluentData; % Conc at time, Ct
+
 % Correct for duplicates in data by adding a small increment to each element
 k = 1;
 while k < (length(Var.Qflow)+1)
@@ -198,14 +202,6 @@ k = k + 1;
 end
   
 %% ODE
-% Intialize variables for assignin
-%VarConc_out = zeros(48,15); 
-%PlantInflow_out = [];
-%T_out = [];
-%MCRT_out = [];
-% Optimize ODE solver
-%figure(1)
-%opts = odeset('MStateDependence','JPattern','Stats','on','OutputFcn',@odeplot);
 odefunc = @(t,x) MLE(t,x,Var,l);
 opts = odeset('MStateDependence','JPattern');
 ODE_sol = ode15s(odefunc,t,x,opts);
@@ -222,14 +218,16 @@ disp('Manipulating large data set, be patient')
 % Reloop
 arrayManip = Array.mleArray;
 int_len = length(arrayManip);
-loop_len = int_len/48;
+compASM = 13; % Number of components in ASM1
+compADM = 35; % Number of components in ADM1
+loop_len = int_len/(compADM + compASM);
 Concentration = [];
 Conc_AD = [];
 i = 1;
-na_int = 1;
-na_end = na_int + 12;
-oa_int = na_end + 1;
-oa_end = na_end + 35;
+na_int = 1; % Start of ASM1 variables
+na_end = na_int + 12; % End of ASM1 variables
+oa_int = na_end + 1; % Start of ADM1 variables
+oa_end = na_end + 35; % End of ADM1 variables
 while i < (loop_len + 1)
     Concentration = [Concentration;arrayManip(na_int:na_end,:)];
     Conc_AD = [Conc_AD;arrayManip(oa_int:oa_end,:)];
@@ -244,34 +242,32 @@ Conc_AD(:,1:12) = [];
 % Set variables
 time = Array.tArray;
 [row,col] = size(Concentration);
-compASM = 13;
-compADM = 35;
 
 %% Carbon content fractions
 % Fractions taken from B&V study
-C_S_I = 0.32; % C content of soluble inert material (Si) [gC/gCOD]
-C_I_P = 0.32; % C content of inert particulate material (Xi) [gC/gCOD]
-C_SB_S = 0.32; % C content of slowly biodegradable substrate (Xs) [gC/gCOD]
-C_S_S = 0.32; % C content of soluble substrate (Ss) [gC/gCOD]
-C_C = 0.32; % C content of colloidal material [gC/gCOD]
-C_A = 0.375; % C content of acetate [gC/gCOD]
-C_P = 0.321; % C content of propionate [gC/gCOD]
-C_M = 0.25; % C content of methanol [gC/gCOD]
-C_S_M = 0.188; % C content of soluble methane [gC/gCOD]
-C_CO2 =  0.273; % C content of carbon dioxide [gC/gCO2]
-C_CC = 0.12; % C content of calcium carbonate (Salk) [gC/gCaCO3]
-C_HB = 0.366; % C content of heterotrophic biomass (Xbh) [gC/gCOD]
-C_AOB = 0.366; % C content of ammonia-oxidizing biomass [gC/gCOD]
-C_NOB = 0.366; % C content of nitrite-oxidizing biomass [gC/gCOD]
+CF.C_S_I = 0.32; % C content of soluble inert material (Si) [gC/gCOD]
+CF.C_I_P = 0.32; % C content of inert particulate material (Xi) [gC/gCOD]
+CF.C_SB_S = 0.32; % C content of slowly biodegradable substrate (Xs) [gC/gCOD]
+CF.C_S_S = 0.32; % C content of soluble substrate (Ss) [gC/gCOD]
+CF.C_C = 0.32; % C content of colloidal material [gC/gCOD]
+CF.C_A = 0.375; % C content of acetate [gC/gCOD]
+CF.C_P = 0.321; % C content of propionate [gC/gCOD]
+CF.C_M = 0.25; % C content of methanol [gC/gCOD]
+CF.C_S_M = 0.188; % C content of soluble methane [gC/gCOD]
+CF.C_CO2 =  0.273; % C content of carbon dioxide [gC/gCO2]
+CF.C_CC = 0.12; % C content of calcium carbonate (Salk) [gC/gCaCO3]
+CF.C_HB = 0.366; % C content of heterotrophic biomass (Xbh) [gC/gCOD]
+CF.C_AOB = 0.366; % C content of ammonia-oxidizing biomass [gC/gCOD]
+CF.C_NOB = 0.366; % C content of nitrite-oxidizing biomass [gC/gCOD]
 % AOB/NOB are autotrophic biomass
-C_AB = 0.366; % C content of autotrophic biomass (Xba) [gC/gCOD]
-C_UB = 0.366; % C content of unbiodegradable residue (Xp) [gC/gCOD]
+CF.C_AB = 0.366; % C content of autotrophic biomass (Xba) [gC/gCOD]
+CF.C_UB = 0.366; % C content of unbiodegradable residue (Xp) [gC/gCOD]
 
 %% Carbon (grams) in system
 % Create arrays for carbon
 % Each carbon component relates to a component in the ASM1 Concentration
-% data set, which will later be multipled by the carbon content fraction
-CSI = 1; Carbon.CSI= [];
+% data set, which will later be multiplied by the carbon content fraction
+CSI = 1; Carbon.CSI = [];
 CSS = 2; Carbon.CSS = [];
 CIP = 3; Carbon.CIP = [];
 CSBS = 4; Carbon.CSBS = [];
@@ -280,7 +276,7 @@ CAB = 6; Carbon.CAB = [];
 CUB = 7; Carbon.CUB = [];
 CCC = 13; Carbon.CCC = [];
 p = 1;
-while p < (length(Concentration) + 1)
+while p < (length(time) + 1)
     Carbon.CSI = [Carbon.CSI;Concentration(CSI,:)];
     Carbon.CSS = [Carbon.CSS;Concentration(CSS,:)];
     Carbon.CIP = [Carbon.CIP;Concentration(CIP,:)];
@@ -314,11 +310,11 @@ Carbon.CCCgrams = Carbon.CSI.*Array.Qarray;
 % Multiply carbon fraction by the corresponding carbon component
 % Methane, methanol, and CO2 still need to be implemented
 m = 1;
-C = [];
-if m < (col + 1)
-    C(:,m) = Carbon.CSIgrams(:,m).*C_S_I + Carbon.CIPgrams(:,m).*C_I_P + Carbon.CSBSgrams(:,m).*C_SB_S +... 
-    Carbon.CSSgrams(:,m).*C_S_S + Carbon.CCCgrams(:,m).*C_CC+ Carbon.CHBgrams(:,m).*C_HB + Carbon.CABgrams(:,m).*C_AB +...
-    Carbon.CUBgrams(:,m).*C_UB;
+C = ones(length(time),col); % Preallocate array
+while m < (col + 1)
+    C(:,m) = Carbon.CSIgrams(:,m).*CF.C_S_I + Carbon.CIPgrams(:,m).*CF.C_I_P + Carbon.CSBSgrams(:,m).*CF.C_SB_S +... 
+    Carbon.CSSgrams(:,m).*CF.C_S_S + Carbon.CCCgrams(:,m).*CF.C_CC+ Carbon.CHBgrams(:,m).*CF.C_HB + Carbon.CABgrams(:,m).*CF.C_AB +...
+    Carbon.CUBgrams(:,m).*CF.C_UB;
     m = m + 1;
 end
 % Mass balance check
@@ -335,8 +331,14 @@ error(:,10) = C(:,15) - C(:,15);
 % Plot error and Carbon flow
 figure(1)
 plot(time,error)
+title('Mass Balance Error')
+ylabel('Error')
+xlabel('Time, days')
 figure(2)
 plot(time,C)
+title('Carbon Flow Throughout System')
+ylabel('Carbon Mass Flowrate, g/day')
+xlabel('Time, days')
 
 %% Plotting separate results
 j = 1;
@@ -377,7 +379,6 @@ while j < (17+1)
         title('Plant flow')
         ylabel('Volumetric Flow, m3/day')
         xlabel('Time, days')
-
     else
     end
     j = j + 1;
@@ -402,7 +403,6 @@ q_gas_h2 = P_gas_h2./P_gas.*q_gas;
 q_gas_ch4 = P_gas_ch4./P_gas.*q_gas;
 q_gas_co2 = P_gas_co2./P_gas.*q_gas;
 q_gas_h2o = l.p_gas_h2o./P_gas.*q_gas;
-
 
 k = 1;
 figure(4)
@@ -448,8 +448,6 @@ Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow 
 opts = optimoptions(@fsolve,'Algorithm', 'levenberg-marquardt');
 Qint = [20000 19000 100 60000 60000 60000 25000 17000 10000 10000 500 10000 600 0 600];
 [Q,~] = fsolve(@(Q) myfunc(Q,Qplant,Var),Qint,opts);
-% assignin('base','PlantInflow',Q);
-% evalin('base','PlantInflow_out = [PlantInflow_out;PlantInflow];');
 function Qsolve = myfunc(Q,Qplant,Var)
 %% Solves flow balance for given plant flow, recycle/waste fractions, and clarifier splits
 % Q(1) = Plant influent
