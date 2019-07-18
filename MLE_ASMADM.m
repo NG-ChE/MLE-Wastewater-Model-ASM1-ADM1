@@ -1,9 +1,12 @@
 tic
 %% TO-DO
+% GO OVER FORTRAN CODE (pg 65 out of 99) OF BENCHMARK SIMULATION MODEL NO.2 FOR
+% ASM/ADM CONVERSION
+
 % Adjust initial values for each stream throughout the entire plant
 % Convert ASM values to ADM
     % Needs to be double checked for errors (units,etc.)
-    
+% Implement FOG for AD    
 % Implement thickener(before AD)/dewatering(after AD)/dryer(after AD)
 % Implement denitrification filter
 
@@ -15,6 +18,8 @@ tic
 % Carbon balance on AD is flat out wrong
 % ***** CHECK UNITS *****
 
+
+%% Changes from last version
 clc
 %clear all
 
@@ -68,7 +73,7 @@ Var.timespan = t;
 
 
 %% Convert typical units coming into plant to ASM1 variables
-% % Units g/m3 = mg/L
+% Units g/m3 = mg/L
 % TSS = 204.85; % mg/L
 % % If no VSS data, assume VSS/TSS ratio of 0.69 or 0.75
 % tv = 0.69;
@@ -85,18 +90,18 @@ Var.timespan = t;
 % CODt = 2.1*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
 % CODbo = 1.71*BOD5; % mgCOD/L, biodegradable COD
 % CODio = CODt - CODbo; % mgCOD/L, inert COD
-% Xio = 0.375*1.5*VSS; % mgCOD/L, particulate inert COD
-% Sio = CODio - Xio; % mgCOD/L, soluble inert COD
-% f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
-% Sso = CODbo*f_readily; % mgCOD/L, readily biodegradable substrate
-% Xso = CODbo - Sso; % mgCOD/L, slowly biodegradable substrate
-% ONtotal = TKN - NH3; % mg-N/L, total organic nitrogen
-% Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
-% in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
-% Xnio = in_xd*Xio; % mg-N/L, 
-% Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
-% Sndo = Snso_Xnso*(Sso/(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
-% Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
+% % Xio = 0.375*1.5*VSS; % mgCOD/L, particulate inert COD
+% % Sio = CODio - Xio; % mgCOD/L, soluble inert COD
+% % f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
+% % Sso = CODbo*f_readily; % mgCOD/L, readily biodegradable substrate
+% % Xso = CODbo - Sso; % mgCOD/L, slowly biodegradable substrate
+% % ONtotal = TKN - NH3; % mg-N/L, total organic nitrogen
+% % Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
+% % in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
+% % Xnio = in_xd*Xio; % mg-N/L, 
+% % Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
+% % Sndo = Snso_Xnso*(Sso/(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
+% % Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
 % Xbho = 0.000000001; %0; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
 % Xbao = 0.000000001; %0; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
 % Soo = 0; % mgO2/L, oxygen concentration
@@ -104,15 +109,19 @@ Var.timespan = t;
 % Salko = ALK/100; % mM/L, alkalinity
 % Snho = NH3; % Initial ammonia
 % Snoo = 0; % Initial nitrite/nitrate
-% alt method (poopyLab github)
-%nb_TKN = TKN*0.03;
-%sol_bio_orgN_ratio = Sso/(Sso+ Xso);
-%inf_S_NS = (TKN - Snho - nb_TKN)*(sol_bio_orgN_ratio);
-%inf_X_NS = (TKN - Snho - nb_TKN)*(1 - sol_bio_orgN_ratio);
+% % alt method (pL github)
+% Sio = 0.13*CODt;
+% Xio = CODio - Sio;
+% Xso = 1.6*VSS - Xio;
+% Sso = CODbo - Xso;
+% nb_TKN = TKN*0.03;
+% sol_bio_orgN_ratio = Sso/(Sso+ Xso);
+% Sndo = (TKN - Snho - nb_TKN)*(sol_bio_orgN_ratio);
+% Xndo = (TKN - Snho - nb_TKN)*(1 - sol_bio_orgN_ratio);
 
 %% Intial conditions for system
-% % assume the initial conditions into plant are those of the reactors
-% % Since we arent dealing with startup, look to adjust initial conditions for each stream 
+% assume the initial conditions into plant are those of the reactors
+% Since we arent dealing with startup, look to adjust initial conditions for each stream 
 Sio  = 30; % Soluble inert organic matter
 Sso  = 69.5; % Readily biodegradable substrate
 Xio  = 51.2; % Particulate inert organic matter
@@ -392,16 +401,18 @@ plot(time,ADMstream.Two);
 title('Anaerobic Digester Gas Effluent')
 ylabel('Concentration, kg/m3')
 xlabel('Time, days')
+legend('H2','CH4','CO2')
 subplot(2,2,3);
 plot(time,ADMstream.Three);
 title('Anaerobic Digester Liquid Effluent')
 ylabel('Concentration, kg/m3')
 xlabel('Time, days')
 subplot(2,2,4);
-plot(time,q_gas);
-title('Anaerobic Digester Gas Flowrate')
-ylabel('Concentration, m3/day')
+plot(time,P_gas_ch4/P_gas,time,P_gas_co2/P_gas,time,P_gas_h2/P_gas);
+title('Anaerobic Digester Partial Pressure')
+ylabel('Partial Pressure')
 xlabel('Time, days')
+legend('CH4','CO2','H2')
 
 %% Carbon (grams) in system
 % Carbon content fractions
@@ -530,22 +541,22 @@ ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,4)
 plot(time,C(:,4))
-title('Mixing Point Before Anoxic Tank')
+title('Anoxic Tank Influent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,5)
 plot(time,C(:,5))
-title('Anoxic Tank Influent')
+title('Anoxic Tank Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,6)
 plot(time,C(:,6))
-title('Aeration Tank Influent')
+title('Aeration Tank Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,7)
 plot(time,C(:,7))
-title('Aeration Tank Effluent')
+title('SC Influent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,8)
@@ -555,12 +566,12 @@ ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,9)
 plot(time,C(:,9))
-title('Secondary Clarifier Effluent')
+title('SC Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,10)
 plot(time,C(:,10))
-title('Secondary Clarifier Underflow')
+title('SC Underflow')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,11)
@@ -877,186 +888,358 @@ while i < (CompASM + 1)
     dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13);
     
     %% Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
-    CODc = 1/1000; % Convert COD ASM1 variables to ADM1 -> g to kg
-    Nc = 1/14/1000; % Convert g N to kmol of N
-    % Assuming alkalinity is calcium carbonate for C conversion
-    Alkc = (0.001/1000)*(12/(12 + 16*3 + 40.078)); % Convert mol/L of Alkalinity to kmol-C/m3
-    CODdemand = dCdt(8,13) + 2.86*dCdt(9,13);
-    if CODdemand > (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
+    % Maybe optimize for loop
+    for lenComp = 1:13
+        xtemp(lenComp) = dCdt(lenComp,13);
+    end
+    for lenADM = 1:24
+        adm(lenADM) = 0;
+    end
+    
+%% Parameters
+tfac = 1/298.15 - 1/(273.15 + 35);
+bigr = 0.08314;
+% CODequiv is the conversion factor for COD demand of nitrate
+% exact value of ASM1 2.86
+ CODequiv = 40/14;
+% fraction of N in amino acids and Xpr as in ADM1 report
+ fnaa = 0.098;
+% N content of biomass based on BSM1, same in AS and AD
+ fnbac = 0.08;
+% N content of composite material based on BSM2
+ fnxc = 0.0376;
+% N content of inerts XI and XP, same in AS and AD
+ fxni = 0.06;
+% N content of SI, zero in ASM1 and BSM1
+ fsni = 0;
+% N content of SI in the AD system
+ fsni_adm = 0.06;
+% fnbac, fxni and fsni are adjusted to fit the benchmark values of iXB=0.08
+% and
+% iXP=0.06 and iSI=0.
+% i.e 8% N content mgCOD/l <-> mgN/l = iXB, in ADM1 8.75%
+ nbac = fnbac/14*14000;
+% i.e. 3.76% N content mgCOD/l <-> mgN/l
+ nxc = fnxc/14*14000;
+% i.e. 9.8% N content mgCOD/l <-> mgN/l
+ naa = fnaa/14*14000;
+% i.e. 6% N content mgCOD/l <-> mgN/l = iXP = iXI
+ xni = fxni/14*14000;
+% i.e. 0% N content mgCOD/l <-> mgN/l = iSI
+ sni = fsni/14*14000;
+ sni_adm = fsni_adm/14*14000;
+% lipid fraction of non-nitrogenous XS in BSM2
+ frlixs = 0.7;
+% anaerobically degradable fraction of biomass in BSM2
+ frxs = 0.68;
+% lipid fraction of non-nitrogenous biomass in BSM2
+ frlixb = 0.4;
+% amount of XI and XP degradable in AD, zero in BSM2
+ fdegrade = 0;
+% Let CODdemand be the COD demand of available electron
+% acceptors prior to the anaerobic digester, i.e. oxygen and nitrate
+ CODdemand = dCdt(8,13) + CODequiv*dCdt(9,13);
+     if CODdemand > (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
         disp('Warning! Influent characterization may need to be evaluated, not enough COD available')
-    else
-    end
+     else
+     end
+ xtemp(8) = 0;
+ xtemp(9) = 0;
     if CODdemand > dCdt(2,13)
-    CODdemand = CODdemand - dCdt(2,13);
-    dCdt(2,13) = - CODdemand;
-        if dCdt(2,13) < 0
-            dCdt(2,13) = 0;
+        remaina = CODdemand - dCdt(2,13);
+        xtemp(2) = 0;
+        if remaina > dCdt(4,13)
+            remainb = remaina - dCdt(4,13);
+            xtemp(4) = 0;
+                if remainb > dCdt(5,13)
+                    remainc = remainb - dCdt(5,13);
+                    xtemp(10) = xtemp(10) + dCdt(5,13)*fnbac;
+                    xtemp(5) = 0;
+                        if remainc > dCdt(6,13)
+                            remaind = remainc - dCdt(6,13);
+                            xtemp(10) = xtemp(10) + dCdt(6,13)*fnbac;
+                            xtemp(6) = 0;
+                            xtemp(8) = remaind;
+                            disp('ERROR: COD shortage when removing inital oxygen and nitrate')
+                        else
+                            xtemp(6) = dCdt(6,13) - remainc;
+                            xtemp(10) = xtemp(10) + remainc*fnbac;
+                        end
+                else
+                    xtemp(5) = dCdt(5,13) - remainb;
+                    xtemp(10) = xtemp(10) + remainb*fnbac;
+                end
         else
+            xtemp(4) = dCdt(4,13) - remaina;
         end
-    elseif CODdemand < dCdt(2,13)
-        dCdt(2,13) = dCdt(2,13) - CODdemand;
-        CODdemand = - dCdt(2,13);
-        if CODdemand < 0
-            CODdemand = 0;
-        else
-        end
-    elseif CODdemand == dCdt(2,13)
-        dCdt(2,13) = dCdt(2,13) - CODdemand;
-        CODdemand = - dCdt(2,13);
+    else
+        xtemp(2) = dCdt(2,13) - CODdemand;
     end
-    if CODdemand > dCdt(4,13)
-        CODdemand = CODdemand - dCdt(4,13);
-        dCdt(4,13) = - CODdemand;
-            if dCdt(4,13) < 0
-                dCdt(4,13) = 0;
+    
+    sorgn = dCdt(11,13)/fnaa;
+    if sorgn >= xtemp(2)
+        adm(2) = xtemp(2);
+        xtemp(11) = xtemp(11) - xtemp(2)*fnaa;
+        xtemp(2) = 0;
+    else
+        adm(2) = sorgn;
+        xtemp(2) = xtemp(2) - sorgn;
+        xtemp(11) = 0;
+    end
+    
+    xorgn = dCdt(12,13)/fnaa;
+    if xorgn >= xtemp(4)
+        xprtemp = xtemp(4);
+        xtemp(12) = xtemp(12) - xtemp(4)*fnaa;
+        xtemp(4) = 0;
+        xlitemp = 0;
+        xchtemp = 0;
+    else
+        xprtemp = xorgn;
+        xlitemp = frlixs*(xtemp(4) - xorgn);
+        xchtemp = (1 - frlixs)*(xtemp(4) - xorgn);
+        xtemp(4) = 0;
+        xtemp(12) = 0;
+    end
+    
+    biomass = xtemp(5) + xtemp(6);
+    biomass_nobio = biomass*(1 - frxs);
+    biomass_bioN = biomass*fnbac - biomass_nobio*fxni;
+    if biomass_bioN < 0
+        disp('ERROR: not enough biomass N to map the requested inert part')
+    end
+    if ((biomass_bioN/fnaa) <= (biomass - biomass_nobio))
+        xprtemp2 = biomass_bioN/fnaa;
+        remainCOD = biomass - biomass_nobio - xprtemp2;
+        if ((xtemp(12)/fnaa) > remainCOD)
+            xprtemp2 = xprtemp2 + remainCOD;
+            xtemp(12) = xtemp(12) - remainCOD*fnaa;
+            remainCOD = 0;
+            xtemp(5) = 0;
+            xtemp(6) = 0;
+        else
+            xprtemp2 = xprtemp2 + xtemp(12)/fnaa;
+            remainCOD = remainCOD - xtemp(12)/fnaa;
+            xtemp(12) = 0;
+        end
+        xlitemp2 = frlixb*remainCOD;
+        xchtemp2 = (1 - frlixb)*remainCOD;
+    else
+        xprtemp2 = biomass - biomass_nobio;
+        xtemp(12) = xtemp(12) + biomass*fnbac - biomass_nobio*fxni - xprtemp2*fnaa;
+    end
+    xtemp(5) = 0;
+    xtemp(6) = 0;
+    
+    inertX = (1 - fdegrade)*(xtemp(3) + xtemp(7));
+    xc = 0;
+    xlitemp3 = 0;
+    xchtemp3 = 0;
+    if fdegrade > 0
+        noninertX = fdegrade*(xtemp(3) + xtemp(7));
+        if ((noninertX*fxni) < (noninertX*fnxc))
+            xc = noninertX*fxni/fnxc;
+            noninertX = noninertX - noninertX*fxni/fnxc;
+            if xtemp(12) < noninertX*fnxc
+                xc = xc + xtemp(12)/fnxc;
+                noninertX = noninertX - xtemp(12)/fnxc;
+                xtemp(12) = 0;
+                if (xtemp(11) < noninertX*fnxc)
+                    xc = xc + temp(11)/fnxc;
+                    noninertX = nonintertX - xtemp(11)/fnxc;
+                    xtemp(11) = 0;
+                    if (xtemp(10) < noninertX*fnxc)
+                        xc = xc + xtemp(10)/fnxc;
+                        noninertX = noninertX - xtemp(10)/fnxc;
+                        xtemp(10) = 0;
+                        disp('ERROR: Nitrogen shortage when converting biodegradable XI&XP')
+                        disp('Putting remaining XI&XP as lipids (50c) and carbohydrates (50%)') 
+                        xlitemp3 = 0.5*noninertX;
+                        xchtemp3 = 0.5*noninertX;
+                        noninertX = 0;
+                    else
+                        xc = xc + noninertX;
+                        xtemp(10) = xtemp(10) - noninertX*fnxc;
+                        noninertX = 0;
+                    end
+                else
+                    xc = xc + noninertX;
+                    xtemp(11) = xtemp(11) - noninertX*fnxc;
+                    noninertX = 0;
+                end
             else
+                xc = xc + noninertX;
+                xtemp(12) = xtemp(12) - noninertX*fnxc;
+                noninertX = 0;
             end
-    elseif CODdemand < dCdt(4,13)
-        dCdt(4,13) = dCdt(4,13) - CODdemand;
-        CODdemand = - dCdt(4,13);
-        if CODdemand < 0
-            CODdemand = 0;
         else
+            xc = xc + noninertX;
+            xtemp(12) = xtemp(12) + noninertX*(fxni - fnxc);
+            noninertX = 0;
         end
-    elseif CODdemand == dCdt(4,13)
-        dCdt(4,13) = dCdt(4,13) - CODdemand;
-        CODdemand = - dCdt(4,13);
-    end
-    if CODdemand > dCdt(5,13)
-    CODdemand = CODdemand - dCdt(5,13);
-    dCdt(5,13) = - CODdemand;
-        if dCdt(5,13) < 0
-            dCdt(5,13) = 0;
-        else
-        end
-    elseif CODdemand < dCdt(5,13)
-        dCdt(5,13) = dCdt(5,13) - CODdemand;
-        CODdemand = - dCdt(5,13);
-        if CODdemand < 0
-            CODdemand = 0;
-        else
-        end
-    elseif CODdemand == dCdt(5,13)
-        dCdt(5,13) = dCdt(5,13) - CODdemand;
-        CODdemand = - dCdt(5,13);
-    end
-    if CODdemand > dCdt(6,13)
-    CODdemand = CODdemand - dCdt(6,13);
-    dCdt(6,13) = - CODdemand;
-        if dCdt(6,13) < 0
-            dCdt(6,13) = 0;
-        else
-        end
-    elseif CODdemand < dCdt(6,13)
-        dCdt(6,13) = dCdt(6,13) - CODdemand;
-        CODdemand = - dCdt(6,13);
-        if CODdemand < 0
-            CODdemand = 0;
-        else
-        end
-    elseif CODdemand == dCdt(6,13)
-        dCdt(6,13) = dCdt(6,13) - CODdemand;
-        CODdemand = - dCdt(6,13);
-    end
-    %% Soluble Organic Nitrogen
-    ReqCODs = (dCdt(11,13)*Nc)/l.N_aa;
-    if dCdt(2,13)*CODc > ReqCODs
-        S_aa_in = ReqCODs;
-        S_su_in = dCdt(2,13)*CODc - ReqCODs;
-    else
-        S_aa_in = dCdt(2,13)*CODc;
-        S_su_in = 0.00000000001;
     end
     
-    %% Soluble Inert Organic Material
-    CODin = dCdt(1,13) + dCdt(2,13) + dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13);
-    CODremain = (CODin - dCdt(2,13))*CODc;
-    OrgN = dCdt(11,13) + dCdt(12,13)- dCdt(10,13);
-    OrgNremain = OrgN*Nc - S_aa_in*l.N_aa;
-    ReqOrgNs = l.N_I*dCdt(1,13)*CODc;
-    if OrgNremain > ReqOrgNs
-        S_I_in = dCdt(1,13)*CODc;
-        S_su_in = S_su_in;
+    inertS = 0;
+    if ((xtemp(1)*fsni) < (xtemp(1)*fsni_adm))
+        inertS = xtemp(1)*fsni/fsni_adm;
+        xtemp(1) = xtemp(1) - xtemp(1)*fsni/fsni_adm;
+        if (xtemp(11) < (xtemp(1)*fsni_adm))
+            inertS = inertS + xtemp(11)/fsni_adm;
+            xtemp(1) = xtemp(1) - xtemp(11)/fsni_adm;
+            xtemp(11) = 0;
+            if (xtemp(12) < (xtemp(1)*fsni_adm))
+                inertS = inertS + xtemp(12)/fsni_adm;
+                xtemp(1) = xtemp(1) - xtemp(12)/fsni_adm;
+                xtemp(12) = 0;
+                if (xtemp(10) < (xtemp(1)*fsni_adm))
+                    inertS = inertS + temp(10)/fsni_adm;
+                    xtemp(1) = xtemp(1) - xtemp(10)/fsni_adm;
+                    xtemp(10) = 0;
+                    disp('ERROR: Nitrogen shortage when converting SI')
+                    disp('Putting remaining SI as monosacharides') 
+                    xtemp(2) = xtemp(2) + xtemp(1);
+                    xtemp(1) = 0;
+                else
+                    inertS = inertS + xtemp(1);
+                    xtemp(10) = xtemp(10) - xtemp(1)*fsni_adm;
+                    xtemp(1) = 0;
+                end
+            else
+                inertS = inertS + xtemp(1);
+                xtemp(12) = xtemp(12) - xtemp(1)*fsni_adm;
+                xtemp(1) = 0;
+            end
+        else
+            inertS = inertS + xtemp(1);
+            xtemp(11) = xtemp(11) - xtemp(1)*fsni_adm;
+            xtemp(1) = 0;
+        end
     else
-        S_I_in = OrgNremain/l.N_I;
-        S_su_in = S_su_in + dCdt(1,13)*CODc - S_I_in;
+        inertS = inertS + xtemp(1);
+        xtemp(11) = xtemp(11) + xtemp(1)*(fsni - fsni_adm);
+        xtemp(1) = 0;
     end
-    CODremain = CODremain - dCdt(1,13)*CODc;
-    OrgNremain = OrgNremain - S_I_in*l.N_I;
     
-    %% Particulate Inert  COD mapping
-    ReqOrgNx = l.f_xI_xc*(dCdt(3,13) + dCdt(7,13))*l.N_I*CODc;
-    if OrgNremain > ReqOrgNx
-        X_I_in = l.f_xI_xc*(dCdt(3,13) + dCdt(7,13))*CODc;
-    else
-        X_I_in = OrgNremain/l.N_I;
-    end
-    CODremain = CODremain - X_I_in;
-    OrgNremain = OrgNremain - X_I_in*l.N_I;
+    adm(1) = xtemp(2)/1000;
+    adm(2) = adm(2)/1000;
+    adm(10) = xtemp(13)/1000;
+    adm(11) = (xtemp(10) + xtemp(11) + xtemp(12))/14000;
+    adm(12) = inertS/1000;
+    adm(13) = xc/1000;
+    adm(14) = (xchtemp + xchtemp2 + xchtemp3)/1000;
+    adm(15) = (xprtemp + xprtemp2)/1000;
+    adm(16) = (xlitemp + xlitemp2 + xlitemp3)/1000;
+    adm(24) = (biomass_nobio + inertX)/1000;
+% Calculation of adm(10) (Sic)
+    % Take average pH from before digester
+    ph = 7;
+    alfachac = (-1/64)/(1 + 10^(4.76 - ph));
+    alfachpro = (-1/112)/(1 + 10^(4.88 - ph));
+    alfachbu = (-1/160)/(1 + 10^(4.82 - ph));
+    alfachva = (-1/208)/(1 + 10^(4.86 - ph));
+    pkk = 9.25 - log10(exp(51965/bigr/100*tfac));
+    alfachin = (10^(pkk - ph))/(1 + 10^(pkk - ph));
+    pkk = 6.35 - log10(exp(7646/bigr/100*tfac));
+    alfachic = -1/(1 + 10^(pkk - ph));
+    % modifie / PV
+    alfachnh = 1/14;
+    alfachno = -1/14;
+    alfachalk = -1;
+    chargeasm1 = (dCdt(13,13)*alfachalk + dCdt(10,13)*alfachnh +...
+        dCdt(9,13)*alfachno)/1000;
+    chargeadm1 = adm(7)*alfachac + adm(6)*alfachpro +...
+        adm(5)*alfachbu + adm(4)*alfachva + adm(11)*alfachin;
+    adm(10) = (chargeasm1 - chargeadm1)/alfachic;
+    pkk = 14 - log10(exp(55900/bigr/100*tfac));
+    ancat = chargeadm1 + adm(10)*alfachic - 10^(-ph) + 10^(-pkk + ph);
     
-    %% Partitioning of Remaining COD and TKN
-    ReqCODXc = OrgNremain/l.N_xc;
-    if CODremain > ReqCODXc
-        X_c_in = ReqCODXc;
-        X_ch_in = (l.f_ch_xc/(l.f_ch_xc + l.f_li_xc))*(CODremain - X_c_in);
-        X_li_in = (l.f_li_xc/(l.f_ch_xc + l.f_li_xc))*(CODremain - X_c_in);
-        S_IN_in = dCdt(10,13)*Nc;
-    else
-        X_c_in = CODremain;
-        X_ch_in = 0.0000000001; % Cant set to exactly zero
-        X_li_in = 0.0000000001; % Cant set to exactly zero
-        S_IN_in = dCdt(10,13)*Nc + OrgNremain - X_c_in*l.N_xc;
+    % Check mass balances
+    totCODin = 0;
+    for vec = 1:7
+        totCODin = totCODin + dCdt(vec,13);
     end
-    % CODremain and TNKremain should be zero.
-    %disp(CODremain)
-    %disp(OrgNremain)
-    S_IC_in = dCdt(13,13)*Alkc;
-    S_cat_in = S_IC_in + 0.035;
-    S_an_in = S_IN_in;
-    % Remaing influent components unaccounted for in the ASM/ADM conversion
-    % Cant set to exactly zero
-    S_fa_in = 0.0000000001; %l.S_fa_in;%0.0000000001;
-    S_va_in = 0.0000000001; %l.S_va_in;%0.0000000001;
-    S_bu_in = 0.0000000001; %l.S_bu_in;%0.0000000001;
-    S_pro_in = 0.0000000001; %l.S_pro_in;%0.0000000001;
-    S_ac_in = 0.0000000001; %l.S_ac_in;%0.0000000001;
-    S_h2_in = 0.0000000001; %l.S_h2_in;%0.0000000001;
-    S_ch4_in = 0.0000000001; %l.S_ch4_in;%0.0000000001;
-    X_pr_in = 0.0000000001; %l.X_pr_in;%0.0000000001;
-    X_su_in = 0.0000000001; %l.X_su_in;%0.0000000001;
-    X_aa_in = 0.0000000001; %l.X_aa_in;%0.0000000001;
-    X_fa_in = 0.0000000001; %l.X_fa_in;%0.0000000001;
-    X_c4_in = 0.0000000001; %l.X_c4_in;%0.0000000001;
-    X_pro_in = 0.0000000001; %l.X_pro_in;%0.0000000001;
-    X_ac_in = 0.0000000001; %l.X_ac_in;%0.0000000001;
-    X_h2_in = 0.0000000001; %l.X_h2_in;%0.0000000001;
+    
+    totNin = dCdt(9,13) + dCdt(10,13) + dCdt(11,13) + dCdt(12,13)...
+        + (nbac/1000)*(dCdt(5,13) + dCdt(6,13)) +  (sni/1000)*dCdt(1,13)...
+        + (xni/1000)*(dCdt(3,13) + dCdt(7,13));
+    
+    totCODout = 0;
+    for vec1 = 1:9
+        totCODout = totCODout + adm(vec1)*1000;
+    end
+    for vec2 = 12:24
+        totCODout = totCODout + adm(vec2)*1000;
+    end
+    
+    totNout = nbac*(adm(17) + adm(18) + adm(19) + adm(20)...
+        + adm(21) + adm(22) + adm(23)) + naa*(adm(2) + adm(15))...
+        + adm(11)*14000 + sni_adm*adm(12) + nxc*adm(13) + xni*adm(24);
+    MBCOD = totCODin - totCODout;
+    MBN = totNin - totNout;
+    
+    % Set adm vector to influent components
+    % Units of [kgCOD/m3]
+    S_su_in = adm(1);
+    S_aa_in = adm(2);
+    S_fa_in = adm(3);
+    S_va_in = adm(4);
+    S_bu_in = adm(5);
+    S_pro_in = adm(6);
+    S_ac_in = adm(7);
+    S_h2_in = adm(8);
+    S_ch4_in = adm(9);
+    S_IC_in = adm(10);
+    S_IN_in = adm(11);
+    S_I_in = adm(12);
+    X_c_in = adm(13);
+    X_ch_in = adm(14);
+    X_pr_in = adm(15);
+    X_li_in = adm(16);
+    X_su_in = adm(17);
+    X_aa_in = adm(18);
+    X_fa_in = adm(19);
+    X_c4_in = adm(20);
+    X_pro_in = adm(21);
+    X_ac_in = adm(22);
+    X_h2_in = adm(23);
+    X_I_in = adm(24);
+    % The loop below is based off of the Matlab code on page 57 of
+    % Benchmark Simulation Model no. 2 (BSM2) paper
+    S_an_in = ancat;
+    if S_an_in < 0
+        S_an_in = -1*S_an_in;
+        S_cat_in = 0;
+    else
+        S_cat_in = S_an_in;
+        S_an_in = 0;
+    end
     % Test variables to see if AD works against original paper
-%     S_su_in = l.S_su_in;
-%     S_aa_in = l.S_aa_in;
-%     S_fa_in = l.S_fa_in;
-%     S_va_in = l.S_va_in;
-%     S_bu_in = l.S_bu_in;
-%     S_pro_in = l.S_pro_in;
-%     S_ac_in = l.S_ac_in;
-%     S_h2_in = l.S_h2_in;
-%     S_ch4_in = l.S_ch4_in;
-%     S_IC_in = l.S_IC_in;
-%     S_IN_in = l.S_IN_in;
-%     S_I_in = l.S_I_in;
-%     X_c_in = l.X_xc_in;
-%     X_ch_in = l.X_ch_in;
-%     X_li_in = l.X_li_in;
-%     X_I_in = l.X_I_in;
-%     S_cat_in = l.S_cat_in;
-%     S_an_in = l.S_an_in;
-%     X_pr_in = l.X_pr_in;
-%     X_su_in = l.X_su_in;
-%     X_aa_in = l.X_aa_in;
-%     X_fa_in = l.X_fa_in;
-%     X_c4_in = l.X_c4_in;
-%     X_pro_in = l.X_pro_in;
-%     X_ac_in = l.X_ac_in;
-%     X_h2_in = l.X_h2_in;
+%     S_su_in = 0; %l.S_su_in;
+%     S_aa_in = 0.043902; %l.S_aa_in;
+%     S_fa_in = 0; %l.S_fa_in;
+%     S_va_in = 0; %l.S_va_in;
+%     S_bu_in = 0; %l.S_bu_in;
+%     S_pro_in = 0; %l.S_pro_in;
+%     S_ac_in = 0; %l.S_ac_in;
+%     S_h2_in = 0; %l.S_h2_in;
+%     S_ch4_in = 0; %l.S_ch4_in;
+%     S_IC_in = 0.007918; %l.S_IC_in;
+%     S_IN_in = 0.001972; %l.S_IN_in;
+%     S_I_in = 0.028067; %l.S_I_in;
+%     X_c_in = 0; %l.X_xc_in;
+%     X_ch_in = 3.7236; %l.X_ch_in;
+%     X_li_in = 8.04686; %l.X_li_in;
+%     X_I_in = 17.011; %l.X_I_in;
+%     S_cat_in = 0; %l.S_cat_in;
+%     S_an_in = 0.0052; %l.S_an_in;
+%     X_pr_in = 15.9243; %l.X_pr_in;
+%     X_su_in = 0; %l.X_su_in;
+%     X_aa_in = 0; %l.X_aa_in;
+%     X_fa_in = 0; %l.X_fa_in;
+%     X_c4_in = 0; %l.X_c4_in;
+%     X_pro_in = 0; %l.X_pro_in;
+%     X_ac_in = 0; %l.X_ac_in;
+%     X_h2_in = 0; %l.X_h2_in;
     % Save to concentration
     dCdt(14,13) = S_su_in;
     dCdt(15,13) = S_aa_in;
@@ -1088,22 +1271,10 @@ while i < (CompASM + 1)
     %l.V_liq = 0.9189*Var.param(27);
     %l.V_gas = 0.0811*Var.param(27);
     %l.q_in = Q(13);
-    % Non-incoming variables
-%     S_vam = dCdt(40,13);
-%     S_bum = dCdt(41,13);
-%     S_prom = dCdt(42,13);
-%     S_acm = dCdt(43,13);
-%     S_hco3m = dCdt(44,13);
-%     S_nh3_in = dCdt(45,13);
-%     S_gas_h2 = dCdt(46,13);
-%     S_gas_ch4 = dCdt(47,13);
-%     S_gas_co2 = dCdt(48,13);
     
 %% AD differential equations
 % Data/Equations pulled from Aspects on ADM1 implementation within the BSM2 framework
 % CHECK PARAMETERS -> CHANGE VOLUMES (headspace/liquid)
-    %Separate the components under ENTIRE while function, this part under
-    %while (i > compASM) && (i < (compADM + 1))
     % Intial conditions inside reactor
     S_su = dCdt(14,15);
     S_aa = dCdt(15,15);
@@ -1316,31 +1487,188 @@ while i < (CompASM + 1)
     Conc(48,14) = -S_gas_co2*q_gas/l.V_gas + rho_T_10*l.V_liq/l.V_gas;                          % 35
     
 %% Conversion from ADM1 to ASM1
+% Use fortran code
+    for vec3 = 1:13
+        asmm(vec3) = 0;
+    end
+    for vec4 = 1:24
+        xtemp(vec4) = dCdt(13 + vec4,15);
+    end
+% Set parameter values
+    fnaa = 0.098;
+    fnxc = 0.0376;
+    fnbac = 0.08;
+    fsni_adm = 0.06;
+    fxni = 0.06;
+    fsni = 0;
+    nbac = fnbac/14*14000;
+    nxc = fnxc/14*14000;
+    naa = fnaa/14*14000;
+    sni_adm = fsni_adm/14*14000;
+    xni = fxni/14*14000;
+    sni = fsni/14*14000;
+    frxs_AS = 0.79;
+    fdegrade_AS = 0;
+
+    biomass = 0;
+    for vec5 = 17:23
+        biomass = biomass + xtemp(vec5)*1000;
+    end
+    biomass_nobio = biomass*(1 - frxs_AS);
+    biomass_bioN = biomass*fnbac - biomass_nobio*fxni;
+    remainCOD = 0;
+    if biomass_bioN < 0
+        disp('Warning 1')
+        xptemp = biomass*fnbacfxni;
+        biomass_bioN = 0;
+    else
+        xptemp = biomass_nobio;
+    end
+    if ((biomass_bioN/fnxc) <= (biomass - biomass_nobio))
+        xstemp = biomass - biomass_nobio - xstemp;
+        if ((xtemp(11)*14000/fnxc) > remainCOD)
+            xstemp = xstemp + remainCOD;
+        else
+            disp('Warning 2')
+            disp('System failure')
+        end
+    else
+        xstemp = biomass - biomass_nobio;
+    end
+    xtemp(11) = xtemp(11) + biomass*fnbac/14000 - xptemp*fxni/14000 ...
+        - xstemp*fnxc/14000;
+        
+    asmm(4) = xstemp;
+    for vec6 = 13:16
+        asmm(4) = asmm(4) + xtemp(vec6)*1000;
+    end
+    
+    asmm(7) = xptemp;
+    
+    inertX = (1 - fdegrade_AS)*xtemp(24)*1000;
+    xstemp2 = 0;
+    noninertX = 0;
+    if (fdegrade_AS > 0)
+        noninertX = fdegrade_AS*xtemp(24)*1000;
+        if fxni < fnxc
+            xstemp2 = noninertX*fxni/fnxc;
+            noninertX = noninertX - noninertX*fnxi/fnxc;
+            if ((xtemp(11)*14000) < (noninertX*fnxc))
+                xstemp2 = xstemp2 + xtemp(11)*14000/fnxc;
+                noninertX = noninertX - xtemp(11)*14000/fnxc;
+                xtemp(11) = 0;
+                disp('Warning 3')
+                inertX = inertX + noninertX;
+            else
+                xstemp2 = xstemp2 + noninertX;
+                xtemp(11) = xtemp(11) - noninertX*fnxc/14000;
+                noninertX = 0;
+            end
+        else
+            xstemp2 = xstemp2 + noninertX;
+            xtemp(11) = xtemp(11) + noninertX*(fnxi - fnxc)/14000;
+            noninertX = 0;
+        end
+    end
+    
+    asmm(3) = inertX;
+    asmm(4) = asmm(4) + xstemp2;
+    
+    inertS = 0;
+    if (fsni_adm <fsni)
+        inertS = xtemp(12)*fsni_adm.fsni;
+        if ((xtemp(11)*14) < (xtemp(12)*fsni))
+            inertS = inertS + xtemp(11)*14/fsni;
+            xtemp(12) = xtemp(12) - xtemp(11)*14/fsni;
+            xtemp(11) = 0;
+            disp('Warning 5')
+        else
+            inertS = inertS + xtemp(12);
+            xtemp(11) = xtemp(11) - xtemp(12)*fsni/14;
+            xtemp(12) = 0;
+        end
+    else
+        inertS = inertS + xtemp(12);
+        xtemp(11) = xtemp(11) + xtemp(12)*(fsni_adm - fsni)/14;
+        xtemp(12) = 0;
+    end
+    
+    asmm(1) = inertS*1000;
+    
+    asmm(12) = fnxc*(xstemp + xstemp2) + nxc*xtemp(13) + naa*xtemp(15);
+    
+    for vec7 = 1:7
+        asmm(2) = asmm(2) + xtemp(vec7)*1000;
+    end
+    
+    asmm(11) = naa*xtemp(2);
+    
+    asmm(10) = xtemp(11)*14000;
+    
+    %% VERIFY pH IS CORRECT DURING ENTIRE SIMULATION
+% Calculation of Salk
+    alfachac = (-1/64)/(1 + 10^(4.76 - pH));
+    alfachpro = (-1/112)/(1 + 10^(4.88 - pH));
+    alfachbu = (-1/160)/(1 + 10^(4.82 - pH));
+    alfachva = (-1/208)/(1 + 10^(4.86 - pH));
+    pkk = 9.25 - log10(exp(51965/bigr/100*tfac));
+    alfachin = (10^(pkk - pH))/(1 + 10^(pkk - pH));
+    pkk = 6.35 - log10(exp(7646/bigr/100*tfac));
+    alfachic = -1/(1 + 10^(pkk - pH));
+% modifie / PV
+    alfachnh = 1/14;
+    alfachno = -1/14;
+    alfachalk = -1;
+    chargeasm1 = asmm(10)*alfachnh + asmm(9)*alfachno;
+    chargeadm1 = (adm(7)*alfachac + adm(6)*alfachpro + adm(11)*alfachin...
+        + adm(5)*alfachbu + adm(4)*alfachva + adm(10)*alfachic)*1000;
+    asmm(13) = chargeasm1 - chargeadm1;
+% Check mass balances
+    totCODin = 0;
+    for vec8 = 1:7
+        totCODin = totCODin + adm(vec8);
+    end
+    for vec9 = 12:24
+        totCODin = totCODin + adm(vec9)*1000;
+    end
+    totTKNin = 0;
+    for vec10 = 17:23
+        totTKNin = totTKNin + nbac*adm(vec10);
+    end
+    totTKNin = totTKNin + nxc*adm(13) + naa*adm(15) + naa*adm(2) +...
+        adm(11)*14000 + sni_adm*adm(12) + xni*adm(15);
+    totCODout = 0;
+    for vec11 = 1:7
+        totCODout = totCODout + asmm(vec11);
+    end
+    % SI_N not included here below
+    totTKNout = asmm(10) + asmm(11) + asmm(12) + fsni*asmm(1) +...
+        fnbac*(asmm(5) + asmm(6)) + fxni*(asmm(3) + asmm(7));
+    MBCOD2 = totCODin - totCODout;
+    MBTNK = totTKNin - totTKNout;
+
     % CONVERT UNITS CORRECTLY BACK TO ASM1
     % CODconserved = CODt_anaerobic - Sh2 - Sch4;
     % COD Conversions
-    dCdt(1,15) = S_I/CODc;
-    dCdt(3,15) = X_I/CODc;
-    dCdt(2,15) = (S_su + S_aa + S_fa + S_va + S_bu + S_pro + S_ac)/CODc;
-    dCdt(4,15) = (X_c + X_ch + X_pr + X_li + X_su + X_aa + X_fa + X_c4 + X_pro + X_ac + X_h2)/CODc;
-    % TKN Conversions
-    dCdt(10,15) = S_IN/Nc;
-    dCdt(11,15) = (S_I*l.N_I + S_aa*l.N_aa)/Nc;
-    % Ixe is unknown, make it same as ixb
-    ixe = ixb/1000; % gN/gCOD -> gN/kgCOD
-    dCdt(12,15) = (l.N_bac*(X_su + X_aa + X_fa + X_c4 + X_pro + X_ac + X_h2) + l.N_I*X_I + l.N_xc*X_c + l.N_aa*X_pr - ixe*X_I)/Nc;
-    dCdt(5,15) = 0;
-    dCdt(6,15) = 0;
-    dCdt(7,15) = 0;
-    dCdt(8,15) = 0;
-    dCdt(13,15) = S_IC/Alkc;
+    dCdt(1,15) = asmm(1);
+    dCdt(2,15) = asmm(2);
+    dCdt(3,15) = asmm(3);
+    dCdt(4,15) = asmm(4);
+    dCdt(5,15) = asmm(5);
+    dCdt(6,15) = asmm(6);
+    dCdt(7,15) = asmm(7);
+    dCdt(8,15) = asmm(8);
+    dCdt(9,15) = asmm(9);
+    dCdt(10,15) = asmm(10);
+    dCdt(11,15) = asmm(11);
+    dCdt(12,15) = asmm(12);
+    dCdt(13,15) = asmm(13);
     i = i + 1;
 end
 vec_len = numel(Conc);
 Conc = reshape(Conc,[vec_len,1]);
 % Due to Conc only changing in the reactors, dCdt variable needs to be
 % saved and sent to the workspace as it used throughout the code to keep track of components
-
 % At time = 1, dont store variable into structure
 if t == 1
     Array.mleArray = dCdt;
