@@ -1,29 +1,32 @@
 tic
 %% TO-DO
-% GO OVER FORTRAN CODE (pg 65 out of 99) OF BENCHMARK SIMULATION MODEL NO.2 FOR
-% ASM/ADM CONVERSION
-
 % Adjust initial values for each stream throughout the entire plant
-% Convert ASM values to ADM
-    % Needs to be double checked for errors (units,etc.)
-% Implement FOG for AD    
+% Implement FOG for AD
+    % No chemical characeristics given, not sure what to do or if even
+    % implement
 % Implement thickener(before AD)/dewatering(after AD)/dryer(after AD)
 % Implement denitrification filter
+% Implement proper secondary clarifier model
+    % Primary clarifier is done but is not removing enough TSS than
+    % whats actually happening at the plant
 
 % Create PID for oxygen transfer in aeration zone
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
-% AD isn't working properly
-% Carbon balance on AD is flat out wrong
+% Flowrate into AD is too high
+    % Verify with operators the actual flow rate
+% Carbon balance on AD is wrong and needs to be adjusted for new ASM/ADM
+% conversion implementation
+    % Stick to ADM variables to calculate carbon flow
+% Components coming into AD are too diluted, causing abnormalities in ADM
+% simulation
+% Volume of AD needs to be adjusted to actual plant dimensions
+    % Volume of headspace above liquid not constant, not sure what to do
+    % about that
 % ***** CHECK UNITS *****
 
-
-%% Changes from last version
 clc
-%clear all
-
-%% Simple simulation of MLE system with no digester.
 
 %% Recycle ratios for MLE system
 Var.Rir = 1.88; % Specify internal recycle ratio MLR/PC_effluent 
@@ -53,15 +56,13 @@ Var.param = [0.67 0.24 0.08 0.08 ...
 0.4 0.3 0.05 0.05 ...
 3 0.1 0.8 40 ...
 10 416.83 5522.15 36339.95 ....
-4803.84 0 3028.329]';
+4803.84 0 6056.65888]';
 
 %% AD parameters
-% ADJUST VALUES
-% ADJUST INITIAL VALUES INSIDE DIFF EQs
-%l = SE_IndataADM1_v2;
+% ADJUST VALUES TO PLANT SPECIFIC DIMENSIONS
 l = IndataADM1_v2;
 
-%% simulation time span (days)
+%% Simulation time span (days)
 % Increase timespan interval for more data points in result section, can
 % signicantly reduce time if interval is very small
 t = 1:0.1:29;
@@ -86,7 +87,8 @@ Var.timespan = t;
 % NO3 = 0.02; % mg-N/L
 % % Alkalinity not given
 % ALK = 200; % mg-N/L
-% % Conversion to ASM1 Variables
+% % Conversion to ASM1 variables using Biological Wastewater Treatment by
+% % Grady, Daigger, Love and Filipe, from Chapter 9.6
 % CODt = 2.1*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
 % CODbo = 1.71*BOD5; % mgCOD/L, biodegradable COD
 % CODio = CODt - CODbo; % mgCOD/L, inert COD
@@ -102,8 +104,8 @@ Var.timespan = t;
 % % Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
 % % Sndo = Snso_Xnso*(Sso/(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
 % % Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
-% Xbho = 0.000000001; %0; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
-% Xbao = 0.000000001; %0; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
+% Xbho = 0.000000001; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
+% Xbao = 0.000000001; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
 % Soo = 0; % mgO2/L, oxygen concentration
 % Xpo = 0; % mgCOD/L, biomass debris 
 % Salko = ALK/100; % mM/L, alkalinity
@@ -438,39 +440,39 @@ CF.C_UB = 0.366; % C content of unbiodegradable residue (Xp) [gC/gCOD]
 % Create arrays for carbon
 % Each carbon component relates to a component in the ASM1 Concentration
 % data set, unless otherwise specified, which will later be multiplied by the carbon content fraction
-CSI = 1; Carbon.CSI = [];
-CSS = 2; Carbon.CSS = [];
-CIP = 3; Carbon.CIP = [];
-CSBS = 4; Carbon.CSBS = [];
-CHB = 5; Carbon.CHB = [];
-CAB = 6; Carbon.CAB = [];
-CUB = 7; Carbon.CUB = [];
-CCC = 13; Carbon.CCC = [];
+loop.CSI = 1; Carbon.CSI = [];
+loop.CSS = 2; Carbon.CSS = [];
+loop.CIP = 3; Carbon.CIP = [];
+loop.CSBS = 4; Carbon.CSBS = [];
+loop.CHB = 5; Carbon.CHB = [];
+loop.CAB = 6; Carbon.CAB = [];
+loop.CUB = 7; Carbon.CUB = [];
+loop.CCC = 13; Carbon.CCC = [];
 % Non-ASM1 variables
-CSM = 34; Carbon.CSM = [];
-CCO2 = 35; Carbon.CCO2 = [];
+loop.CSM = 34; Carbon.CSM = [];
+loop.CCO2 = 35; Carbon.CCO2 = [];
 p = 1;
 while p < (length(time) + 1)
-    Carbon.CSI = [Carbon.CSI;Concentration(CSI,:)];
-    Carbon.CSS = [Carbon.CSS;Concentration(CSS,:)];
-    Carbon.CIP = [Carbon.CIP;Concentration(CIP,:)];
-    Carbon.CSBS = [Carbon.CSBS;Concentration(CSBS,:)];
-    Carbon.CHB= [Carbon.CHB;Concentration(CHB,:)];
-    Carbon.CAB = [Carbon.CAB;Concentration(CAB,:)];
-    Carbon.CUB = [Carbon.CUB;Concentration(CUB,:)];
-    Carbon.CCC = [Carbon.CCC;Concentration(CCC,:)];
-    Carbon.CSM = [Carbon.CSM;Conc_AD(CSM,:)];
-    Carbon.CCO2 = [Carbon.CCO2;Conc_AD(CCO2,:)];
-    CSI = CCC + 1;
-    CSS = CCC + 2;
-    CIP = CCC + 3;
-    CSBS = CCC + 4;
-    CHB = CCC + 5;
-    CAB = CCC + 6;
-    CUB = CCC + 7;
-    CCC = CCC + 13;
-    CSM = CCO2 + 34;
-    CCO2 = CCO2 + 35;
+    Carbon.CSI = [Carbon.CSI;Concentration(loop.CSI,:)];
+    Carbon.CSS = [Carbon.CSS;Concentration(loop.CSS,:)];
+    Carbon.CIP = [Carbon.CIP;Concentration(loop.CIP,:)];
+    Carbon.CSBS = [Carbon.CSBS;Concentration(loop.CSBS,:)];
+    Carbon.CHB= [Carbon.CHB;Concentration(loop.CHB,:)];
+    Carbon.CAB = [Carbon.CAB;Concentration(loop.CAB,:)];
+    Carbon.CUB = [Carbon.CUB;Concentration(loop.CUB,:)];
+    Carbon.CCC = [Carbon.CCC;Concentration(loop.CCC,:)];
+    Carbon.CSM = [Carbon.CSM;Conc_AD(loop.CSM,:)];
+    Carbon.CCO2 = [Carbon.CCO2;Conc_AD(loop.CCO2,:)];
+    loop.CSI = loop.CCC + 1;
+    loop.CSS = loop.CCC + 2;
+    loop.CIP = loop.CCC + 3;
+    loop.CSBS = loop.CCC + 4;
+    loop.CHB = loop.CCC + 5;
+    loop.CAB = loop.CCC + 6;
+    loop.CUB = loop.CCC + 7;
+    loop.CCC = loop.CCC + 13;
+    loop.CSM = loop.CCO2 + 34;
+    loop.CCO2 = loop.CCO2 + 35;
     p = p + 1;
 end 
 % Convert concentration to mass/time 
@@ -490,29 +492,29 @@ Carbon.CCO2kmoleC = Carbon.CCO2.*q_gas.*1000; % Convert to mol
 % Multiply carbon fraction by the corresponding carbon component
 % Methanol still needs to be implemented
 m = 1;
-C = ones(length(time),col); % Preallocate array
+Cflow = ones(length(time),col); % Preallocate array
 while m < (col + 1)
-    C(:,m) = Carbon.CSIgrams(:,m).*CF.C_S_I + Carbon.CIPgrams(:,m).*CF.C_I_P + Carbon.CSBSgrams(:,m).*CF.C_SB_S +... 
+    Cflow(:,m) = Carbon.CSIgrams(:,m).*CF.C_S_I + Carbon.CIPgrams(:,m).*CF.C_I_P + Carbon.CSBSgrams(:,m).*CF.C_SB_S +... 
     Carbon.CSSgrams(:,m).*CF.C_S_S + Carbon.CCCgrams(:,m).*CF.C_CC+ Carbon.CHBgrams(:,m).*CF.C_HB + Carbon.CABgrams(:,m).*CF.C_AB +...
     Carbon.CUBgrams(:,m).*CF.C_UB;
     m = m + 1;
 end
 % Adjust for gas stream
 % Convert from COD to grams and mol to grams
-C(:,14) = Carbon.CSMkgram(:,2).*CF.C_S_M + Carbon.CCO2kmoleC(:,2).*12.01; 
+Cflow(:,14) = Carbon.CSMkgram(:,2).*CF.C_S_M + Carbon.CCO2kmoleC(:,2).*12.01; 
 % Convert grams to lbs 
-C = 0.00220462.*C;
+Cflow = 0.00220462.*Cflow;
 % Mass balance check
 PerError = [];
-PerError(:,1) = 100.*abs(C(:,1) - (C(:,2) + C(:,3)))./C(:,1);
-PerError(:,2) = 100.*abs(C(:,4) - (C(:,12) + C(:,8)+ C(:,2)))./C(:,4);
-PerError(:,3) = 100.*abs(C(:,4) - C(:,5))./C(:,4);
-PerError(:,4) = 100.*abs(C(:,5) - C(:,6))./C(:,5);
-PerError(:,5) = 100.*abs(C(:,6) - (C(:,8) + C(:,7)))./C(:,6);
-PerError(:,6) = 100.*abs(C(:,7) - (C(:,9) + C(:,10)))./C(:,7);
-PerError(:,7) = 100.*abs(C(:,10) - (C(:,12) + C(:,11)))./C(:,10);
-PerError(:,8) = 100.*abs(C(:,1) - (C(:,11) + C(:,9) + C(:,3)))./C(:,1);
-PerError(:,9) = 100.*abs(C(:,13) - (C(:,11) + C(:,3)))./C(:,13);
+PerError(:,1) = 100.*abs(Cflow(:,1) - (Cflow(:,2) + Cflow(:,3)))./Cflow(:,1);
+PerError(:,2) = 100.*abs(Cflow(:,4) - (Cflow(:,12) + Cflow(:,8)+ Cflow(:,2)))./Cflow(:,4);
+PerError(:,3) = 100.*abs(Cflow(:,4) - Cflow(:,5))./Cflow(:,4);
+PerError(:,4) = 100.*abs(Cflow(:,5) - Cflow(:,6))./Cflow(:,5);
+PerError(:,5) = 100.*abs(Cflow(:,6) - (Cflow(:,8) + Cflow(:,7)))./Cflow(:,6);
+PerError(:,6) = 100.*abs(Cflow(:,7) - (Cflow(:,9) + Cflow(:,10)))./Cflow(:,7);
+PerError(:,7) = 100.*abs(Cflow(:,10) - (Cflow(:,12) + Cflow(:,11)))./Cflow(:,10);
+PerError(:,8) = 100.*abs(Cflow(:,1) - (Cflow(:,11) + Cflow(:,9) + Cflow(:,3)))./Cflow(:,1);
+PerError(:,9) = 100.*abs(Cflow(:,13) - (Cflow(:,11) + Cflow(:,3)))./Cflow(:,13);
 % Ignore Carbon balance on AD for now
 %PerError(:,10) = 100.*abs(C(:,13) - C(:,15) - C(:,14))./C(:,13);
 % Plot percent error
@@ -525,62 +527,62 @@ xlabel('Time, days')
 % Plot carbon flow for each stream separately
 figure(4)
 subplot(4,5,1)
-plot(time,C(:,1))
+plot(time,Cflow(:,1))
 title('Plant Influent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,2)
-plot(time,C(:,2))
+plot(time,Cflow(:,2))
 title('Primary Clarifier Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,3)
-plot(time,C(:,3))
+plot(time,Cflow(:,3))
 title('Primary Clarifier WAS')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,4)
-plot(time,C(:,4))
+plot(time,Cflow(:,4))
 title('Anoxic Tank Influent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,5)
-plot(time,C(:,5))
+plot(time,Cflow(:,5))
 title('Anoxic Tank Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,6)
-plot(time,C(:,6))
+plot(time,Cflow(:,6))
 title('Aeration Tank Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,7)
-plot(time,C(:,7))
+plot(time,Cflow(:,7))
 title('SC Influent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,8)
-plot(time,C(:,8))
+plot(time,Cflow(:,8))
 title('Internal Recycle')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,9)
-plot(time,C(:,9))
+plot(time,Cflow(:,9))
 title('SC Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,10)
-plot(time,C(:,10))
+plot(time,Cflow(:,10))
 title('SC Underflow')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,11)
-plot(time,C(:,11))
+plot(time,Cflow(:,11))
 title('WAS Stream')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 subplot(4,5,12)
-plot(time,C(:,12))
+plot(time,Cflow(:,12))
 title('RAS Stream')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
@@ -614,7 +616,7 @@ CompADM = 35;
 %% Dynamic flow
 % Constant Plant flow - > testing average data -> using gal/min going into
 % NT converted to m3/day
-%Qplant = 57622.44668;
+Qplant = 57622.44668;
 Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow at specified time
 %% Flow solver
 opts = optimoptions(@fsolve,'Algorithm', 'levenberg-marquardt');
@@ -689,7 +691,7 @@ Vol2 = Var.param(23); % anoxic m3, taken as total volume of NT anoxic tanks
 Vol3 = Var.param(24); % aeration m3, taken as total volume of NT aeration tanks
 Vol4 = Var.param(25); % secondary clarifier m3, taken as volume of a cylinder, and only one NT clarifier
 %Vol5 = Var.param(26); % denit filters m3
-Vol6 = Var.param(27); % AD volume
+Vol6 = Var.param(27); % AD volume, taken as two digesters in parallel as per B&V study
 
 
 %% Component Identification
@@ -758,7 +760,7 @@ while i < (CompASM + 1)
     %% Modeling primary clarifier - Otterpohl and Freund 1992
 %     hrt = Vol1/Q(1); % Hydraulic residence time
 %     n_COD = 2.7*log(hrt*hrt + 9)/100; % Removal efficiency
-    XCOD1 = dCdt(3,1) + dCdt(4,1) + dCdt(5,1) + dCdt(6,1) + dCdt(7,1); % Particulate COD in influent
+%     XCOD1 = dCdt(3,1) + dCdt(4,1) + dCdt(5,1) + dCdt(6,1) + dCdt(7,1); % Particulate COD in influent
 %     CODin = dCdt(1,1) + dCdt(2,1) + XCOD1; % Total COD in influent
 %     n_x = (n_COD*CODin)/XCOD1;
 %     if n_x > 0.95
@@ -799,7 +801,6 @@ while i < (CompASM + 1)
         dCdt(i,3) = dCdt(i,1);
     end
     dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); % Mass balance for flow into/out of Primary Clarifier
-
     %% Recycle split, same concentration
     mass = zeros(13,12);
     mass(i,2) = Q(2)*dCdt(i,2);
@@ -882,8 +883,7 @@ while i < (CompASM + 1)
 %     assignin('base','MCRT_step',MCRT);
 %     evalin('base','MCRT_out(end+1) = MCRT_step;');
 %% Conversion from ASM1 to ADM1
-    % Using paper: TOWARDS AN ASM1 - ADM1 STATE VARIABLE INTERFACE FOR
-    % PLANT-WIDE WASTEWATER TREATMENT MODELING
+    % Using paper: Benchmark Simulation Model No.2 (BSM2)
     %% Waste sludge mixing
     dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13);
     
@@ -897,8 +897,8 @@ while i < (CompASM + 1)
     end
     
 %% Parameters
-tfac = 1/298.15 - 1/(273.15 + 35);
-bigr = 0.08314;
+ tfac = 1/298.15 - 1/(273.15 + 35);
+ bigr = 0.08314;
 % CODequiv is the conversion factor for COD demand of nitrate
 % exact value of ASM1 2.86
  CODequiv = 40/14;
@@ -1268,9 +1268,9 @@ bigr = 0.08314;
     dCdt(38,13) = S_cat_in;
     dCdt(39,13) = S_an_in;
     % Variable change to check against AD paper
-    %l.V_liq = 0.9189*Var.param(27);
-    %l.V_gas = 0.0811*Var.param(27);
-    %l.q_in = Q(13);
+    l.V_gas = 19.98697; % m3 headspace volume taken from B&V study
+    l.V_liq = Vol6 - l.V_gas; % m3
+    %Q(13) = l.q_in;
     
 %% AD differential equations
 % Data/Equations pulled from Aspects on ADM1 implementation within the BSM2 framework
