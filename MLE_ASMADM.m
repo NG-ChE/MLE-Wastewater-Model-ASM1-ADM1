@@ -4,7 +4,9 @@ tic
 % Implement FOG for AD
     % No chemical characeristics given, not sure what to do or if even
     % implement
+% Implement primary bypass
 % Implement thickener(before AD)/dewatering(after AD)/dryer(after AD)
+    % Thickener implemented
 % Implement denitrification filter
 % Implement proper secondary clarifier model
     % Primary clarifier is done but is not removing enough TSS than
@@ -14,13 +16,9 @@ tic
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
-% Flowrate into AD is too high
-    % Verify with operators the actual flow rate
 % Carbon balance on AD is wrong and needs to be adjusted for new ASM/ADM
 % conversion implementation
     % Stick to ADM variables to calculate carbon flow
-% Components coming into AD are too diluted, causing abnormalities in ADM
-% simulation
 % Volume of AD needs to be adjusted to actual plant dimensions
     % Volume of headspace above liquid not constant, not sure what to do
     % about that
@@ -45,6 +43,7 @@ elseif Var.fsc < 0
     Var.fsc = 0;
 else
 end
+Var.ft = 0.18358; % Flow fraction of concentrated TSS stream with respect to inflow
 
 %% biological parameters and volumes
 % Check parameter values with other reported values
@@ -55,8 +54,13 @@ Var.param = [0.67 0.24 0.08 0.08 ...
 0.5 0.8 0.8 1 ...
 0.4 0.3 0.05 0.05 ...
 3 0.1 0.8 40 ...
-10 416.83 5522.15 36339.95 ....
-4803.84 0 6056.65888]';
+10 ...
+1782.92895 ... 416.83 ... % Primary clarifier volume m3 (470,000 gal) taken from B&V
+999.348711 ... 5522.15 ... % Anoxic tank volume m3 (264,000 gal) taken from B&V
+999.348711 ... 36339.95 .... % Aeration tank volume m3 (264,000 gal) taken from B&V
+19229.891863 ... 4803.84 ... % Secondary clarifier volume m3 (5,080,000 gal) taken from B&V
+0 ...
+6056.65888]'; % Digester total volume in m3 (taken as 1.6 MG)
 
 %% AD parameters
 % ADJUST VALUES TO PLANT SPECIFIC DIMENSIONS
@@ -75,23 +79,23 @@ Var.timespan = t;
 
 %% Convert typical units coming into plant to ASM1 variables
 % Units g/m3 = mg/L
-% TSS = 204.85; % mg/L
-% % If no VSS data, assume VSS/TSS ratio of 0.69 or 0.75
-% tv = 0.69;
-% VSS = TSS*tv;
-% FSS = TSS - VSS; % fixed suspended solids
-% % USING CBOD5 FROM DATA
-% BOD5 = 150.76; % mg/L
-% TKN = 44.19; % mg-N/L
-% NH3 = 29.1; % mg-N/L
-% NO3 = 0.02; % mg-N/L
-% % Alkalinity not given
-% ALK = 200; % mg-N/L
+TSS = 204.85; % mg/L
+% If no VSS data, assume VSS/TSS ratio of 0.69 or 0.75
+tv = 0.69;
+VSS = TSS*tv;
+FSS = TSS - VSS; % fixed suspended solids
+% USING CBOD5 FROM DATA
+BOD5 = 150.76; % mg/L
+TKN = 44.19; % mg-N/L
+NH3 = 29.1; % mg-N/L
+NO3 = 0.02; % mg-N/L
+% Alkalinity not given, will have Thursday from Albert
+ALK = 700; % mg-N/L
 % % Conversion to ASM1 variables using Biological Wastewater Treatment by
 % % Grady, Daigger, Love and Filipe, from Chapter 9.6
-% CODt = 2.1*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
-% CODbo = 1.71*BOD5; % mgCOD/L, biodegradable COD
-% CODio = CODt - CODbo; % mgCOD/L, inert COD
+CODt = 2.1*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
+CODbo = 1.71*BOD5; % mgCOD/L, biodegradable COD
+CODio = CODt - CODbo; % mgCOD/L, inert COD
 % % Xio = 0.375*1.5*VSS; % mgCOD/L, particulate inert COD
 % % Sio = CODio - Xio; % mgCOD/L, soluble inert COD
 % % f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
@@ -104,39 +108,39 @@ Var.timespan = t;
 % % Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
 % % Sndo = Snso_Xnso*(Sso/(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
 % % Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
-% Xbho = 0.000000001; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
-% Xbao = 0.000000001; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
-% Soo = 0; % mgO2/L, oxygen concentration
-% Xpo = 0; % mgCOD/L, biomass debris 
-% Salko = ALK/100; % mM/L, alkalinity
-% Snho = NH3; % Initial ammonia
-% Snoo = 0; % Initial nitrite/nitrate
-% % alt method (pL github)
-% Sio = 0.13*CODt;
-% Xio = CODio - Sio;
-% Xso = 1.6*VSS - Xio;
-% Sso = CODbo - Xso;
-% nb_TKN = TKN*0.03;
-% sol_bio_orgN_ratio = Sso/(Sso+ Xso);
-% Sndo = (TKN - Snho - nb_TKN)*(sol_bio_orgN_ratio);
-% Xndo = (TKN - Snho - nb_TKN)*(1 - sol_bio_orgN_ratio);
+Xbho = 0.000000001; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
+Xbao = 0.000000001; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
+Soo = 0; % mgO2/L, oxygen concentration
+Xpo = 0; % mgCOD/L, biomass debris 
+Salko = ALK/100; % mM/L, alkalinity
+Snho = NH3; % Initial ammonia
+Snoo = 0; % Initial nitrite/nitrate
+% alt method (pL github)
+Sio = 0.13*CODt;
+Xio = CODio - Sio;
+Xso = 1.6*VSS - Xio;
+Sso = CODbo - Xso;
+nb_TKN = TKN*0.03;
+sol_bio_orgN_ratio = Sso/(Sso+ Xso);
+Sndo = (TKN - Snho - nb_TKN)*(sol_bio_orgN_ratio);
+Xndo = (TKN - Snho - nb_TKN)*(1 - sol_bio_orgN_ratio);
 
 %% Intial conditions for system
 % assume the initial conditions into plant are those of the reactors
 % Since we arent dealing with startup, look to adjust initial conditions for each stream 
-Sio  = 30; % Soluble inert organic matter
-Sso  = 69.5; % Readily biodegradable substrate
-Xio  = 51.2; % Particulate inert organic matter
-Xso  = 202.32; % Slowly biodegradable substrate
-Xbho = 28.17; % Active heterotrophic biomass
-Xbao = 25; % Active autotrophic biomass
-Xpo  = 0; % Particulate products arising from biomass decay
-Soo  = 0; % Oxygen
-Snoo = 0; % Nitrate and nitrite nitrogen
-Snho = 5; % NH 4+ + NH 3 nitrogen
-Sndo = 6.95; % Soluble biodegradable organic nitrogen
-Xndo = 5; % Particulate biodegradable organic nitrogen
-Salko = 7; % Alkalinity
+% Sio  = 30; % Soluble inert organic matter
+% Sso  = 69.5; % Readily biodegradable substrate
+% Xio  = 51.2; % Particulate inert organic matter
+% Xso  = 202.32; % Slowly biodegradable substrate
+% Xbho = 28.17; % Active heterotrophic biomass
+% Xbao = 25; % Active autotrophic biomass
+% Xpo  = 0; % Particulate products arising from biomass decay
+% Soo  = 0; % Oxygen
+% Snoo = 0; % Nitrate and nitrite nitrogen
+% Snho = 5; % NH 4+ + NH 3 nitrogen
+% Sndo = 6.95; % Soluble biodegradable organic nitrogen
+% Xndo = 5; % Particulate biodegradable organic nitrogen
+% Salko = 7; % Alkalinity
 MLE_int = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko]; % Create vector of initial values for the MLE system
 AD_int = [0.009;... % S_su
 0.0009;...          % S_aa
@@ -174,7 +178,7 @@ AD_int = [0.009;... % S_su
 1.62125;...         % ch4
 0.01411]';          % co2
 sys_int = [MLE_int AD_int]; % Combine initial conditions
-x = sys_int(:)*ones(1,15); % Format to an array of [components,streams]
+x = sys_int(:)*ones(1,17); % Format to an array of [components,streams]
 
 %% Import data for varying influent flow
 dat_dry = importdata('datos/Inf_dry_2006.txt','\t',1);
@@ -248,7 +252,7 @@ while i < (loop_len + 1)
     i = i + 1;
 end
 % Remove dummy AD columns
-Conc_AD(:,1:12) = [];
+Conc_AD(:,1:14) = [];
 % Set variables
 time = Array.tArray;
 [row,col] = size(Concentration);
@@ -270,8 +274,10 @@ ASMstream.Ten = reshape(Concentration(:,10),[compASM,length(time)])';
 ASMstream.Eleven = reshape(Concentration(:,11),[compASM,length(time)])';
 ASMstream.Twelve = reshape(Concentration(:,12),[compASM,length(time)])';
 ASMstream.Thirteen = reshape(Concentration(:,13),[compASM,length(time)])';
-% ASM1 variables that have been converted from ADM1
+ASMstream.Fourteen = reshape(Concentration(:,14),[compASM,length(time)])';
 ASMstream.Fifteen = reshape(Concentration(:,15),[compASM,length(time)])';
+% ASM1 variables that have been converted from ADM1
+ASMstream.Seventeen = reshape(Concentration(:,17),[compASM,length(time)])';
 
 figure(1)
 subplot(4,5,1)
@@ -340,26 +346,36 @@ title('Mixing of WAS and PS')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
 subplot(4,5,14)
-plot(time,ASMstream.Fifteen)
-title('Digester Sludge Stream')
+plot(time,ASMstream.Fourteen)
+title('Thickener Centrate Stream')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
 subplot(4,5,15)
+plot(time,ASMstream.Fifteen)
+title('Thickener Sludge Stream')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,5,16)
+plot(time,ASMstream.Seventeen)
+title('Digester Sludge Stream')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,5,17)
 plot(time,Array.Qarray)
 title('Plant Influent Flowrate')
 ylabel('Volumetric Flow, m3/day')
 xlabel('Time, days')
-subplot(4,5,16)
+subplot(4,5,18)
 plot(time,ASMstream.Nine(:,10))
 title('Plant Effluent Ammonia')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,17)
+subplot(4,5,19)
 plot(time,ASMstream.Nine(:,9))
 title('Plant Effluent Nitrate/Nitrite')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,18)
+subplot(4,5,20)
 plot(time,ASMstream.Nine(:,8))
 title('Plant Effluent DO')
 ylabel('Concentration, mg/L')
@@ -410,7 +426,7 @@ title('Anaerobic Digester Liquid Effluent')
 ylabel('Concentration, kg/m3')
 xlabel('Time, days')
 subplot(2,2,4);
-plot(time,P_gas_ch4/P_gas,time,P_gas_co2/P_gas,time,P_gas_h2/P_gas);
+plot(time,P_gas_ch4./P_gas,time,P_gas_co2./P_gas,time,P_gas_h2./P_gas);
 title('Anaerobic Digester Partial Pressure')
 ylabel('Partial Pressure')
 xlabel('Time, days')
@@ -501,7 +517,7 @@ while m < (col + 1)
 end
 % Adjust for gas stream
 % Convert from COD to grams and mol to grams
-Cflow(:,14) = Carbon.CSMkgram(:,2).*CF.C_S_M + Carbon.CCO2kmoleC(:,2).*12.01; 
+Cflow(:,16) = Carbon.CSMkgram(:,2).*CF.C_S_M + Carbon.CCO2kmoleC(:,2).*12.01; 
 % Convert grams to lbs 
 Cflow = 0.00220462.*Cflow;
 % Mass balance check
@@ -515,8 +531,9 @@ PerError(:,6) = 100.*abs(Cflow(:,7) - (Cflow(:,9) + Cflow(:,10)))./Cflow(:,7);
 PerError(:,7) = 100.*abs(Cflow(:,10) - (Cflow(:,12) + Cflow(:,11)))./Cflow(:,10);
 PerError(:,8) = 100.*abs(Cflow(:,1) - (Cflow(:,11) + Cflow(:,9) + Cflow(:,3)))./Cflow(:,1);
 PerError(:,9) = 100.*abs(Cflow(:,13) - (Cflow(:,11) + Cflow(:,3)))./Cflow(:,13);
+PerError(:,10) = 100.*abs(Cflow(:,13) - Cflow(:,15) - Cflow(:,14))./Cflow(:,13);
 % Ignore Carbon balance on AD for now
-%PerError(:,10) = 100.*abs(C(:,13) - C(:,15) - C(:,14))./C(:,13);
+%PerError(:,11) = 100.*abs(C(:,15) - C(:,17) - C(:,16))./C(:,13);
 % Plot percent error
 figure(3)
 plot(time,PerError)
@@ -592,13 +609,13 @@ xlabel('Time, days')
 % title('Mixing of WAS and PS')
 % ylabel('Carbon Flow, lb/day')
 % xlabel('Time, days')
-% subplot(4,5,14)
-% plot(time,C(:,14))
+% subplot(4,5,16)
+% plot(time,C(:,16))
 % title('Anaerobic Digester Gas Stream')
 % ylabel('Carbon Flow, lb/day')
 % xlabel('Time, days')
-% subplot(4,5,15)
-% plot(time,C(:,15))
+% subplot(4,5,17)
+% plot(time,C(:,17))
 % title('Anaerobic Digester Sludge Stream')
 % ylabel('Carbon Flow, lb/day')
 % xlabel('Time, days')
@@ -611,18 +628,19 @@ fprintf('The total elapsed time is %.2f minutes',(totalTime/60))
 function [Conc] = MLE(t,dCdt,Var,l)
 persistent KLa
 persistent Array
+persistent ft
 CompASM = 13;
 CompADM = 35;
 %% Dynamic flow
 % Constant Plant flow - > testing average data -> using gal/min going into
-% NT converted to m3/day
+% NT flow converted to m3/day
 Qplant = 57622.44668;
-Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow at specified time
-%% Flow solver
+%Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow at specified time
+%% Flow solver  
 opts = optimoptions(@fsolve,'Algorithm', 'levenberg-marquardt');
-Qint = [20000 19000 100 60000 60000 60000 25000 17000 10000 10000 500 10000 600 0 600];
-[Q,~] = fsolve(@(Q) myfunc(Q,Qplant,Var),Qint,opts);
-function Qsolve = myfunc(Q,Qplant,Var)
+Qint = [20000 19000 100 60000 60000 60000 25000 17000 10000 10000 500 10000 600 500 100 0 100];
+[Q,~] = fsolve(@(Q) myfunc(Q,Qplant,Var,ft),Qint,opts);
+function Qsolve = myfunc(Q,Qplant,Var,ft)
 %% Solves flow balance for given plant flow, recycle/waste fractions, and clarifier splits
 % Q(1) = Plant influent
 % Q(2) = Primary clarifier effluent
@@ -637,14 +655,17 @@ function Qsolve = myfunc(Q,Qplant,Var)
 % Q(11) = WAS
 % Q(12) = RAS
 % Q(13) = mixing of WAS and PC waste sludge sent to AD
-% Q(14) = gas flow -> this is generated -> not in mass balance
-% Q(15) = liquid flow
+% Q(14) = centrate from thickener
+% Q(15) = concentrated sludge to digester
+% Q(16) = gas flow -> this is generated -> not in mass balance
+% Q(17) = liquid flow out of digester
 Qsolve = [Qplant - Q(1);
 Q(1) - Q(3) - Q(2);
 Var.Rir*Q(2) - Q(8);
 Var.Rr*Q(2) - Q(12);
 Var.fpc*Q(1) - Q(3);
 Var.fsc*Q(10) - Q(12);
+ft*Q(13) - Q(15);
 Q(2) + Q(8) + Q(12) - Q(4);
 Q(5) - Q(4);
 Q(6) - Q(5);
@@ -653,7 +674,8 @@ Q(9) + Q(10) - Q(7);
 Q(12) + Q(11) - Q(10);
 Q(3) + Q(9) + Q(11) - Q(1);
 Q(3) + Q(11) - Q(13);
-Q(13) - Q(15);
+Q(14) + Q(15) - Q(13);
+Q(15) - Q(17);
 ];
 end
 % Fixes structure of intial values from vector to an array
@@ -749,6 +771,9 @@ theta2 = [muh*(dCdt(2,6)/(Ks+dCdt(2,6)))*(dCdt(8,6)/(Koh+dCdt(8,6)))*dCdt(5,6);.
 % Q(7) + Q(8) - Q(6); % recycle split
 % Q(9) + Q(10) - Q(7); % secondary clarifier
 % Q(12) + Q(11) - Q(10); % RAS/WAS split
+% Q(3) + Q(11) - Q(13); % Mixing of WAS and primary sludge
+% Q(14) + Q(15) - Q(13); % Thickener balance
+% Q(15) - Q(17); % Digester balance
 
 %% ODE for MLE system
 % Concentration of component i in stream 1-12
@@ -758,7 +783,7 @@ Conc = zeros(length(dCdt),numel(Q));
 while i < (CompASM + 1)
     % Model won't be used for my plant simulation
     %% Modeling primary clarifier - Otterpohl and Freund 1992
-%     hrt = Vol1/Q(1); % Hydraulic residence time
+%     hrt = Vol1/Q(1) % Hydraulic residence time
 %     n_COD = 2.7*log(hrt*hrt + 9)/100; % Removal efficiency
 %     XCOD1 = dCdt(3,1) + dCdt(4,1) + dCdt(5,1) + dCdt(6,1) + dCdt(7,1); % Particulate COD in influent
 %     CODin = dCdt(1,1) + dCdt(2,1) + XCOD1; % Total COD in influent
@@ -770,13 +795,13 @@ while i < (CompASM + 1)
 %     else
 %        n_x = n_x;
 %     end
-%     n_x = (1-n_x);
+%     n_x = (1-n_x)
     %% TSS removal
     n_x = 0.533; % Fraction of TSS left in effluent, taken as average from ST and NT from Appendix B GPS-X files from B&V
     % Determine which components are separated
     % Comment out the two lines below to run constant influent data
-    Dyn_conc = interp1(Var.Ct,Var.C,t); % Interpolate data set of concentration at specified time
-    dCdt(i,1) = Dyn_conc(:,i);
+%     Dyn_conc = interp1(Var.Ct,Var.C,t); % Interpolate data set of concentration at specified time
+%     dCdt(i,1) = Dyn_conc(:,i);
     
     if i < 3
         dCdt(i,2) = dCdt(i,1);
@@ -856,22 +881,22 @@ while i < (CompASM + 1)
     Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
     if i == 8
         % Rough control of DO in aeration zone
-        tadj = round(t*100)/100;
-        t_find = find(tadj == Var.tsample);
+        vectorT = ismembertol(t,Var.timespan,0.001);
+        Tfind = find(vectorT == 1);
         dCdt(10,6);
         dCdt(8,6);
         if t == 1
             KLa = Var.param(20); % Oxygen transfer coefficient
         else
         end
-%         if numel(t_find) > 0
-%             if dCdt(10,6) > 5
-%                 KLa = Var.param(20);
-%             else
-%                 KLa = 0;
-%             end
-%         else
-%         end
+        if Tfind > 0
+            if dCdt(10,6) > 5
+                KLa = Var.param(20);
+            else
+                KLa = 0;
+            end
+        else
+        end
         Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
     else 
         Conc(i,6) = Conc(i,6);
@@ -887,10 +912,58 @@ while i < (CompASM + 1)
     %% Waste sludge mixing
     dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13);
     
+    %% Thickener 
+    % Removal efficiency of 0.8 of TSS
+    % dCdt(i,15) going to digester
+    TSSx = 1 - 0.8;
+    if i < 3
+        dCdt(i,14) = dCdt(i,13);
+    elseif (2<i) && (i<8)
+        dCdt(i,14) = TSSx*dCdt(i,13)*Q(13)/Q(14);
+    elseif (7<i) && (i<12)
+        dCdt(i,14) = dCdt(i,1); 
+    elseif (11<i) && (i<13)
+        dCdt(i,14) = TSSx*dCdt(i,13)*Q(13)/Q(14);
+    else
+        dCdt(i,14) = dCdt(i,13);
+    end
+    if i < 3
+        dCdt(i,15) = dCdt(i,13);
+    elseif (2<i) && (i<8)
+        dCdt(i,15) = (1 - TSSx)*dCdt(i,13)*Q(13)/Q(15);
+    elseif (7<i) && (i<12)
+        dCdt(i,15) = dCdt(i,13);
+    elseif (11<i) && (i<13)
+        dCdt(i,15) = (1 - TSSx)*dCdt(i,13)*Q(13)/Q(15);
+    else
+        dCdt(i,15) = dCdt(i,13);
+    end
+    dCdt(i,13) = (dCdt(i,14)*Q(14) + dCdt(i,15)*Q(15))/Q(13);
+    if t == 1
+    ft = Var.ft;
+    elseif t >= 1.05
+        % Avoid large dataset and quicken solver time by only aquiring data at the specified time span
+        Tvector = ismembertol(t,Var.timespan,0.001);
+        find_T = find(Tvector == 1);
+        if find_T > 0
+        XCOD15 = 0.75*(dCdt(3,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15) + dCdt(7,15));
+        % Control variable -> TSS concentration
+        % Adjust fraction of flow out of thickener to achieve required TSS
+            if XCOD15 < 38000
+                ft = ft*0.95;
+            elseif XCOD15 > 42000
+                ft = ft*1.05;
+            else
+            end
+        else
+        end
+    else
+    end
+    disp(ft)
     %% Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
     % Maybe optimize for loop
     for lenComp = 1:13
-        xtemp(lenComp) = dCdt(lenComp,13);
+        xtemp(lenComp) = dCdt(lenComp,15);
     end
     for lenADM = 1:24
         adm(lenADM) = 0;
@@ -938,45 +1011,45 @@ while i < (CompASM + 1)
  fdegrade = 0;
 % Let CODdemand be the COD demand of available electron
 % acceptors prior to the anaerobic digester, i.e. oxygen and nitrate
- CODdemand = dCdt(8,13) + CODequiv*dCdt(9,13);
-     if CODdemand > (dCdt(2,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13))
+ CODdemand = dCdt(8,15) + CODequiv*dCdt(9,15);
+     if CODdemand > (dCdt(2,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15))
         disp('Warning! Influent characterization may need to be evaluated, not enough COD available')
      else
      end
  xtemp(8) = 0;
  xtemp(9) = 0;
-    if CODdemand > dCdt(2,13)
-        remaina = CODdemand - dCdt(2,13);
+    if CODdemand > dCdt(2,15)
+        remaina = CODdemand - dCdt(2,15);
         xtemp(2) = 0;
-        if remaina > dCdt(4,13)
-            remainb = remaina - dCdt(4,13);
+        if remaina > dCdt(4,15)
+            remainb = remaina - dCdt(4,15);
             xtemp(4) = 0;
-                if remainb > dCdt(5,13)
-                    remainc = remainb - dCdt(5,13);
-                    xtemp(10) = xtemp(10) + dCdt(5,13)*fnbac;
+                if remainb > dCdt(5,15)
+                    remainc = remainb - dCdt(5,15);
+                    xtemp(10) = xtemp(10) + dCdt(5,15)*fnbac;
                     xtemp(5) = 0;
-                        if remainc > dCdt(6,13)
-                            remaind = remainc - dCdt(6,13);
-                            xtemp(10) = xtemp(10) + dCdt(6,13)*fnbac;
+                        if remainc > dCdt(6,15)
+                            remaind = remainc - dCdt(6,15);
+                            xtemp(10) = xtemp(10) + dCdt(6,15)*fnbac;
                             xtemp(6) = 0;
                             xtemp(8) = remaind;
                             disp('ERROR: COD shortage when removing inital oxygen and nitrate')
                         else
-                            xtemp(6) = dCdt(6,13) - remainc;
+                            xtemp(6) = dCdt(6,15) - remainc;
                             xtemp(10) = xtemp(10) + remainc*fnbac;
                         end
                 else
-                    xtemp(5) = dCdt(5,13) - remainb;
+                    xtemp(5) = dCdt(5,15) - remainb;
                     xtemp(10) = xtemp(10) + remainb*fnbac;
                 end
         else
-            xtemp(4) = dCdt(4,13) - remaina;
+            xtemp(4) = dCdt(4,15) - remaina;
         end
     else
-        xtemp(2) = dCdt(2,13) - CODdemand;
+        xtemp(2) = dCdt(2,15) - CODdemand;
     end
     
-    sorgn = dCdt(11,13)/fnaa;
+    sorgn = dCdt(11,15)/fnaa;
     if sorgn >= xtemp(2)
         adm(2) = xtemp(2);
         xtemp(11) = xtemp(11) - xtemp(2)*fnaa;
@@ -987,7 +1060,7 @@ while i < (CompASM + 1)
         xtemp(11) = 0;
     end
     
-    xorgn = dCdt(12,13)/fnaa;
+    xorgn = dCdt(12,15)/fnaa;
     if xorgn >= xtemp(4)
         xprtemp = xtemp(4);
         xtemp(12) = xtemp(12) - xtemp(4)*fnaa;
@@ -1145,8 +1218,8 @@ while i < (CompASM + 1)
     alfachnh = 1/14;
     alfachno = -1/14;
     alfachalk = -1;
-    chargeasm1 = (dCdt(13,13)*alfachalk + dCdt(10,13)*alfachnh +...
-        dCdt(9,13)*alfachno)/1000;
+    chargeasm1 = (dCdt(13,15)*alfachalk + dCdt(10,15)*alfachnh +...
+        dCdt(9,15)*alfachno)/1000;
     chargeadm1 = adm(7)*alfachac + adm(6)*alfachpro +...
         adm(5)*alfachbu + adm(4)*alfachva + adm(11)*alfachin;
     adm(10) = (chargeasm1 - chargeadm1)/alfachic;
@@ -1156,12 +1229,12 @@ while i < (CompASM + 1)
     % Check mass balances
     totCODin = 0;
     for vec = 1:7
-        totCODin = totCODin + dCdt(vec,13);
+        totCODin = totCODin + dCdt(vec,15);
     end
     
-    totNin = dCdt(9,13) + dCdt(10,13) + dCdt(11,13) + dCdt(12,13)...
-        + (nbac/1000)*(dCdt(5,13) + dCdt(6,13)) +  (sni/1000)*dCdt(1,13)...
-        + (xni/1000)*(dCdt(3,13) + dCdt(7,13));
+    totNin = dCdt(9,15) + dCdt(10,15) + dCdt(11,15) + dCdt(12,15)...
+        + (nbac/1000)*(dCdt(5,15) + dCdt(6,15)) +  (sni/1000)*dCdt(1,15)...
+        + (xni/1000)*(dCdt(3,15) + dCdt(7,15));
     
     totCODout = 0;
     for vec1 = 1:9
@@ -1174,8 +1247,8 @@ while i < (CompASM + 1)
     totNout = nbac*(adm(17) + adm(18) + adm(19) + adm(20)...
         + adm(21) + adm(22) + adm(23)) + naa*(adm(2) + adm(15))...
         + adm(11)*14000 + sni_adm*adm(12) + nxc*adm(13) + xni*adm(24);
-    MBCOD = totCODin - totCODout;
-    MBN = totNin - totNout;
+    MBCODin = totCODin - totCODout;
+    MBNin = totNin - totNout;
     
     % Set adm vector to influent components
     % Units of [kgCOD/m3]
@@ -1241,32 +1314,32 @@ while i < (CompASM + 1)
 %     X_ac_in = 0; %l.X_ac_in;
 %     X_h2_in = 0; %l.X_h2_in;
     % Save to concentration
-    dCdt(14,13) = S_su_in;
-    dCdt(15,13) = S_aa_in;
-    dCdt(16,13) = S_fa_in;
-    dCdt(17,13) = S_va_in;
-    dCdt(18,13) = S_bu_in;
-    dCdt(19,13) = S_pro_in;
-    dCdt(20,13) = S_ac_in;
-    dCdt(21,13) = S_h2_in;
-    dCdt(22,13) = S_ch4_in;
-    dCdt(23,13) = S_IC_in;
-    dCdt(24,13) = S_IN_in;
-    dCdt(25,13) = S_I_in;
-    dCdt(26,13) = X_c_in;
-    dCdt(27,13) = X_ch_in;
-    dCdt(28,13) = X_pr_in;
-    dCdt(29,13) = X_li_in;
-    dCdt(30,13) = X_su_in;
-    dCdt(31,13) = X_aa_in;
-    dCdt(32,13) = X_fa_in;
-    dCdt(33,13) = X_c4_in;
-    dCdt(34,13) = X_pro_in;
-    dCdt(35,13) = X_ac_in;
-    dCdt(36,13) = X_h2_in;
-    dCdt(37,13) = X_I_in;
-    dCdt(38,13) = S_cat_in;
-    dCdt(39,13) = S_an_in;
+    dCdt(14,15) = S_su_in;
+    dCdt(15,15) = S_aa_in;
+    dCdt(16,15) = S_fa_in;
+    dCdt(17,15) = S_va_in;
+    dCdt(18,15) = S_bu_in;
+    dCdt(19,15) = S_pro_in;
+    dCdt(20,15) = S_ac_in;
+    dCdt(21,15) = S_h2_in;
+    dCdt(22,15) = S_ch4_in;
+    dCdt(23,15) = S_IC_in;
+    dCdt(24,15) = S_IN_in;
+    dCdt(25,15) = S_I_in;
+    dCdt(26,15) = X_c_in;
+    dCdt(27,15) = X_ch_in;
+    dCdt(28,15) = X_pr_in;
+    dCdt(29,15) = X_li_in;
+    dCdt(30,15) = X_su_in;
+    dCdt(31,15) = X_aa_in;
+    dCdt(32,15) = X_fa_in;
+    dCdt(33,15) = X_c4_in;
+    dCdt(34,15) = X_pro_in;
+    dCdt(35,15) = X_ac_in;
+    dCdt(36,15) = X_h2_in;
+    dCdt(37,15) = X_I_in;
+    dCdt(38,15) = S_cat_in;
+    dCdt(39,15) = S_an_in;
     % Variable change to check against AD paper
     l.V_gas = 19.98697; % m3 headspace volume taken from B&V study
     l.V_liq = Vol6 - l.V_gas; % m3
@@ -1276,41 +1349,41 @@ while i < (CompASM + 1)
 % Data/Equations pulled from Aspects on ADM1 implementation within the BSM2 framework
 % CHECK PARAMETERS -> CHANGE VOLUMES (headspace/liquid)
     % Intial conditions inside reactor
-    S_su = dCdt(14,15);
-    S_aa = dCdt(15,15);
-    S_fa = dCdt(16,15);
-    S_va = dCdt(17,15);
-    S_bu = dCdt(18,15);
-    S_pro = dCdt(19,15);
-    S_ac = dCdt(20,15);
-    S_h2 = dCdt(21,15);
-    S_ch4 = dCdt(22,15);
-    S_IC = dCdt(23,15);
-    S_IN = dCdt(24,15);
-    S_I = dCdt(25,15);
-    X_c = dCdt(26,15);
-    X_ch = dCdt(27,15);
-    X_pr = dCdt(28,15);
-    X_li = dCdt(29,15);
-    X_su = dCdt(30,15);
-    X_aa = dCdt(31,15);
-    X_fa = dCdt(32,15);
-    X_c4 = dCdt(33,15);
-    X_pro = dCdt(34,15);
-    X_ac = dCdt(35,15);
-    X_h2 = dCdt(36,15);
-    X_I = dCdt(37,15);
-    S_cat = dCdt(38,15);
-    S_an = dCdt(39,15);
-    S_vam = dCdt(40,15);
-    S_bum = dCdt(41,15);
-    S_prom = dCdt(42,15);
-    S_acm = dCdt(43,15);
-    S_hco3m = dCdt(44,15);
-    S_nh3 = dCdt(45,15);
-    S_gas_h2 = dCdt(46,14);
-    S_gas_ch4 = dCdt(47,14);
-    S_gas_co2 = dCdt(48,14);
+    S_su = dCdt(14,17);
+    S_aa = dCdt(15,17);
+    S_fa = dCdt(16,17);
+    S_va = dCdt(17,17);
+    S_bu = dCdt(18,17);
+    S_pro = dCdt(19,17);
+    S_ac = dCdt(20,17);
+    S_h2 = dCdt(21,17);
+    S_ch4 = dCdt(22,17);
+    S_IC = dCdt(23,17);
+    S_IN = dCdt(24,17);
+    S_I = dCdt(25,17);
+    X_c = dCdt(26,17);
+    X_ch = dCdt(27,17);
+    X_pr = dCdt(28,17);
+    X_li = dCdt(29,17);
+    X_su = dCdt(30,17);
+    X_aa = dCdt(31,17);
+    X_fa = dCdt(32,17);
+    X_c4 = dCdt(33,17);
+    X_pro = dCdt(34,17);
+    X_ac = dCdt(35,17);
+    X_h2 = dCdt(36,17);
+    X_I = dCdt(37,17);
+    S_cat = dCdt(38,17);
+    S_an = dCdt(39,17);
+    S_vam = dCdt(40,17);
+    S_bum = dCdt(41,17);
+    S_prom = dCdt(42,17);
+    S_acm = dCdt(43,17);
+    S_hco3m = dCdt(44,17);
+    S_nh3 = dCdt(45,17);
+    S_gas_h2 = dCdt(46,16);
+    S_gas_ch4 = dCdt(47,16);
+    S_gas_co2 = dCdt(48,16);
     
     % Gas pressure
     P_gas_h2 = S_gas_h2*l.R*l.T_op/16;
@@ -1414,85 +1487,84 @@ while i < (CompASM + 1)
     
     % Differential equations 1-4, soluble matter
                                                                                                 % State No.
-    Conc(14,15) = Q(13)/l.V_liq*(S_su_in - S_su) + rho_2 + (1 - l.f_fa_li)*rho_4 - rho_5;       % 1
-    Conc(15,15) = Q(13)/l.V_liq*(S_aa_in - S_aa) + rho_3 - rho_6;                               % 2
-    Conc(16,15) = Q(13)/l.V_liq*(S_fa_in - S_fa) + l.f_fa_li*rho_4 - rho_7;                     % 3
-    Conc(17,15) = Q(13)/l.V_liq*(S_va_in - S_va) + (1 - l.Y_aa)*l.f_va_aa*rho_6 - rho_8;        % 4
+    Conc(14,17) = Q(13)/l.V_liq*(S_su_in - S_su) + rho_2 + (1 - l.f_fa_li)*rho_4 - rho_5;       % 1
+    Conc(15,17) = Q(13)/l.V_liq*(S_aa_in - S_aa) + rho_3 - rho_6;                               % 2
+    Conc(16,17) = Q(13)/l.V_liq*(S_fa_in - S_fa) + l.f_fa_li*rho_4 - rho_7;                     % 3
+    Conc(17,17) = Q(13)/l.V_liq*(S_va_in - S_va) + (1 - l.Y_aa)*l.f_va_aa*rho_6 - rho_8;        % 4
     
     % Differential equations 5-8, soluble matter
-    Conc(18,15) = Q(13)/l.V_liq*(S_bu_in - S_bu) + (1 - l.Y_su)*l.f_bu_su*rho_5 + ...           % 5
+    Conc(18,17) = Q(13)/l.V_liq*(S_bu_in - S_bu) + (1 - l.Y_su)*l.f_bu_su*rho_5 + ...           % 5
     (1 - l.Y_aa)*l.f_bu_aa*rho_6 - rho_9; 
-    Conc(19,15) = Q(13)/l.V_liq*(S_pro_in - S_pro) + (1 - l.Y_su)*l.f_pro_su*rho_5 + ...          % 6 
+    Conc(19,17) = Q(13)/l.V_liq*(S_pro_in - S_pro) + (1 - l.Y_su)*l.f_pro_su*rho_5 + ...          % 6 
     (1 - l.Y_aa)*l.f_pro_aa*rho_6 + (1-l.Y_c4)*0.54*rho_8 - rho_10;
-    Conc(20,15) = Q(13)/l.V_liq*(S_ac_in - S_ac) + (1 - l.Y_su)*l.f_ac_su*rho_5 + ...             % 7
+    Conc(20,17) = Q(13)/l.V_liq*(S_ac_in - S_ac) + (1 - l.Y_su)*l.f_ac_su*rho_5 + ...             % 7
     (1 - l.Y_aa)*l.f_ac_aa*rho_6 + (1 - l.Y_fa)*0.7*rho_7 + ... 
     (1 - l.Y_c4)*0.31*rho_8 + (1 - l.Y_c4)*0.8*rho_9 + ... 
     (1 - l.Y_pro)*0.57*rho_10 - rho_11;
-    Conc(21,15) = Q(13)/l.V_liq*(S_h2_in - S_h2) + (1 - l.Y_su)*l.f_h2_su*rho_5 + ...           % 8
+    Conc(21,17) = Q(13)/l.V_liq*(S_h2_in - S_h2) + (1 - l.Y_su)*l.f_h2_su*rho_5 + ...           % 8
     (1 - l.Y_aa)*l.f_h2_aa*rho_6 + (1 - l.Y_fa)*0.3*rho_7 + ... 
     (1 - l.Y_c4)*0.15*rho_8 + (1 - l.Y_c4)*0.2*rho_9 + ... 
     (1 - l.Y_pro)*0.43*rho_10 - rho_12 - rho_T_8;
 
     % Differential equations 9-12, soluble matter
-    Conc(22,15) = Q(13)/l.V_liq*(S_ch4_in - S_ch4) + (1 - l.Y_ac)*rho_11 + ...                  % 9
+    Conc(22,17) = Q(13)/l.V_liq*(S_ch4_in - S_ch4) + (1 - l.Y_ac)*rho_11 + ...                  % 9
     (1 - l.Y_h2)*rho_12 - rho_T_9; 
-    Conc(23,15) = Q(13)/l.V_liq*(S_IC_in - S_IC) - (s_1*rho_1 + s_2*rho_2 + ...                 % 10
+    Conc(23,17) = Q(13)/l.V_liq*(S_IC_in - S_IC) - (s_1*rho_1 + s_2*rho_2 + ...                 % 10
     s_3*rho_3 + s_4*rho_4 + s_5*rho_5 + s_6*rho_6 + s_7*rho_7 + ... 
     s_8*rho_8 + s_9*rho_9 + s_10*rho_10 + s_11*rho_11 + s_12*rho_12 + ... 
     s_13*(rho_13 + rho_14 + rho_15 + rho_16... 
     + rho_17 + rho_18 + rho_19)) - rho_T_10; 
-    Conc(24,15) = Q(13)/l.V_liq*(S_IN_in - S_IN) - l.Y_su*l.N_bac*rho_5 + ...                   % 11
+    Conc(24,17) = Q(13)/l.V_liq*(S_IN_in - S_IN) - l.Y_su*l.N_bac*rho_5 + ...                   % 11
     (l.N_aa - l.Y_aa*l.N_bac)*rho_6 - l.Y_fa*l.N_bac*rho_7 - ... 
     l.Y_c4*l.N_bac*rho_8 - l.Y_c4*l.N_bac*rho_9 - ... 
     l.Y_pro*l.N_bac*rho_10 - l.Y_ac*l.N_bac*rho_11 - ... 
     l.Y_h2*l.N_bac*rho_12 + (l.N_bac - l.N_xc)*... 
     (rho_13 + rho_14 + rho_15 + rho_16 + rho_17 + rho_18 +... 
     rho_19) + (l.N_xc - l.f_xI_xc*l.N_I - l.f_sI_xc*l.N_I - l.f_pr_xc*l.N_aa)*rho_1; 
-    Conc(25,15) = Q(13)/l.V_liq*(S_I_in - S_I) + l.f_sI_xc*rho_1;                               % 12
+    Conc(25,17) = Q(13)/l.V_liq*(S_I_in - S_I) + l.f_sI_xc*rho_1;                               % 12
     
     % Differential equations 13-16, particulate matter
-    Conc(26,15) = Q(13)/l.V_liq*(X_c_in - X_c) - rho_1 + ...                                   % 13
+    Conc(26,17) = Q(13)/l.V_liq*(X_c_in - X_c) - rho_1 + ...                                   % 13
     rho_13 + rho_14 + rho_15 + rho_16 + rho_17 + rho_18 + rho_19; 
-    Conc(27,15) = Q(13)/l.V_liq*(X_ch_in - X_ch) + l.f_ch_xc*rho_1 - rho_2;                     % 14
-    Conc(28,15) = Q(13)/l.V_liq*(X_pr_in - X_pr) + l.f_pr_xc*rho_1 - rho_3;                     % 15
-    Conc(29,15) = Q(13)/l.V_liq*(X_li_in - X_li) + l.f_li_xc*rho_1 - rho_4;                     % 16
+    Conc(27,17) = Q(13)/l.V_liq*(X_ch_in - X_ch) + l.f_ch_xc*rho_1 - rho_2;                     % 14
+    Conc(28,17) = Q(13)/l.V_liq*(X_pr_in - X_pr) + l.f_pr_xc*rho_1 - rho_3;                     % 15
+    Conc(29,17) = Q(13)/l.V_liq*(X_li_in - X_li) + l.f_li_xc*rho_1 - rho_4;                     % 16
     
     % Differential equations 17-20, particulate matter
-    Conc(30,15) = Q(13)/l.V_liq*(X_su_in - X_su) + l.Y_su*rho_5 - rho_13;                       % 17
-    Conc(31,15) = Q(13)/l.V_liq*(X_aa_in - X_aa) + l.Y_aa*rho_6 - rho_14;                       % 18
-    Conc(32,15) = Q(13)/l.V_liq*(X_fa_in - X_fa) + l.Y_fa*rho_7 - rho_15;                       % 19
-    Conc(33,15)  = Q(13)/l.V_liq*(X_c4_in - X_c4) + l.Y_c4*rho_8 + l.Y_c4*rho_9 - rho_16;       % 20
+    Conc(30,17) = Q(13)/l.V_liq*(X_su_in - X_su) + l.Y_su*rho_5 - rho_13;                       % 17
+    Conc(31,17) = Q(13)/l.V_liq*(X_aa_in - X_aa) + l.Y_aa*rho_6 - rho_14;                       % 18
+    Conc(32,17) = Q(13)/l.V_liq*(X_fa_in - X_fa) + l.Y_fa*rho_7 - rho_15;                       % 19
+    Conc(33,17)  = Q(13)/l.V_liq*(X_c4_in - X_c4) + l.Y_c4*rho_8 + l.Y_c4*rho_9 - rho_16;       % 20
     
     % Differential equations 21-24, particulate matter
-    Conc(34,15) = Q(13)/l.V_liq*(X_pro_in - X_pro) + l.Y_pro*rho_10 - rho_17;                   % 21
-    Conc(35,15) = Q(13)/l.V_liq*(X_ac_in - X_ac) + l.Y_ac*rho_11 - rho_18;                      % 22
-    Conc(36,15) = Q(13)/l.V_liq*(X_h2_in - X_h2) + l.Y_h2*rho_12 - rho_19;                      % 23
-    Conc(37,15) = Q(13)/l.V_liq*(X_I_in - X_I) + l.f_xI_xc*rho_1;                               % 24
+    Conc(34,17) = Q(13)/l.V_liq*(X_pro_in - X_pro) + l.Y_pro*rho_10 - rho_17;                   % 21
+    Conc(35,17) = Q(13)/l.V_liq*(X_ac_in - X_ac) + l.Y_ac*rho_11 - rho_18;                      % 22
+    Conc(36,17) = Q(13)/l.V_liq*(X_h2_in - X_h2) + l.Y_h2*rho_12 - rho_19;                      % 23
+    Conc(37,17) = Q(13)/l.V_liq*(X_I_in - X_I) + l.f_xI_xc*rho_1;                               % 24
     
     % Differential equations 25-26, cations and anions
-    Conc(38,15) = Q(13)/l.V_liq*(S_cat_in - S_cat);                                             % 25
-    Conc(39,15) = Q(13)/l.V_liq*(S_an_in - S_an);                                               % 26
+    Conc(38,17) = Q(13)/l.V_liq*(S_cat_in - S_cat);                                             % 25
+    Conc(39,17) = Q(13)/l.V_liq*(S_an_in - S_an);                                               % 26
     
     % Differential equations 27-32, ion states
-    Conc(40,15) = -rho_A_4;                                                                     % 27
-    Conc(41,15) = -rho_A_5;                                                                     % 28
-    Conc(42,15) = -rho_A_6;                                                                     % 29
-    Conc(43,15) = -rho_A_7;                                                                     % 30
-    Conc(44,15) = -rho_A_10;                                                                    % 31
-    Conc(45,15) = -rho_A_11;                                                                    % 32
+    Conc(40,17) = -rho_A_4;                                                                     % 27
+    Conc(41,17) = -rho_A_5;                                                                     % 28
+    Conc(42,17) = -rho_A_6;                                                                     % 29
+    Conc(43,17) = -rho_A_7;                                                                     % 30
+    Conc(44,17) = -rho_A_10;                                                                    % 31
+    Conc(45,17) = -rho_A_11;                                                                    % 32
     
     % Differential equations 33-35, gas phase equations
-    Conc(46,14) = -S_gas_h2*q_gas/l.V_gas + rho_T_8*l.V_liq/l.V_gas;                            % 33
-    Conc(47,14) = -S_gas_ch4*q_gas/l.V_gas + rho_T_9*l.V_liq/l.V_gas;                           % 34
-    Conc(48,14) = -S_gas_co2*q_gas/l.V_gas + rho_T_10*l.V_liq/l.V_gas;                          % 35
+    Conc(46,16) = -S_gas_h2*q_gas/l.V_gas + rho_T_8*l.V_liq/l.V_gas;                            % 33
+    Conc(47,16) = -S_gas_ch4*q_gas/l.V_gas + rho_T_9*l.V_liq/l.V_gas;                           % 34
+    Conc(48,16) = -S_gas_co2*q_gas/l.V_gas + rho_T_10*l.V_liq/l.V_gas;                          % 35
     
 %% Conversion from ADM1 to ASM1
-% Use fortran code
     for vec3 = 1:13
         asmm(vec3) = 0;
     end
     for vec4 = 1:24
-        xtemp(vec4) = dCdt(13 + vec4,15);
+        xtemp(vec4) = dCdt(13 + vec4,17);
     end
 % Set parameter values
     fnaa = 0.098;
@@ -1519,14 +1591,18 @@ while i < (CompASM + 1)
     remainCOD = 0;
     if biomass_bioN < 0
         disp('Warning 1')
-        xptemp = biomass*fnbacfxni;
+        xptemp = biomass*fnbac/fxni;
+        % added from matlab code of BSM2
+        biomass_nobio = xptemp;
         biomass_bioN = 0;
     else
         xptemp = biomass_nobio;
     end
     if ((biomass_bioN/fnxc) <= (biomass - biomass_nobio))
-        xstemp = biomass - biomass_nobio - xstemp;
-        if ((xtemp(11)*14000/fnxc) > remainCOD)
+        xstemp = biomass_bioN/fnxc;
+        remainCOD = biomass - biomass_nobio - xstemp;
+        % added >= instead of > from matlab code of BSM2 
+        if ((xtemp(11)*14000/fnxc) >= remainCOD)
             xstemp = xstemp + remainCOD;
         else
             disp('Warning 2')
@@ -1575,8 +1651,10 @@ while i < (CompASM + 1)
     asmm(4) = asmm(4) + xstemp2;
     
     inertS = 0;
-    if (fsni_adm <fsni)
-        inertS = xtemp(12)*fsni_adm.fsni;
+    if (fsni_adm < fsni)
+        inertS = xtemp(12)*fsni_adm/fsni;
+        % added from matlab code of BSM2
+        xtemp(12) = xtemp(12) - xtemp(12)*fsni_adm/fsni;
         if ((xtemp(11)*14) < (xtemp(12)*fsni))
             inertS = inertS + xtemp(11)*14/fsni;
             xtemp(12) = xtemp(12) - xtemp(11)*14/fsni;
@@ -1636,7 +1714,7 @@ while i < (CompASM + 1)
         totTKNin = totTKNin + nbac*adm(vec10);
     end
     totTKNin = totTKNin + nxc*adm(13) + naa*adm(15) + naa*adm(2) +...
-        adm(11)*14000 + sni_adm*adm(12) + xni*adm(15);
+        adm(11)*14000 + sni_adm*adm(12) + xni*adm(24);
     totCODout = 0;
     for vec11 = 1:7
         totCODout = totCODout + asmm(vec11);
@@ -1644,25 +1722,25 @@ while i < (CompASM + 1)
     % SI_N not included here below
     totTKNout = asmm(10) + asmm(11) + asmm(12) + fsni*asmm(1) +...
         fnbac*(asmm(5) + asmm(6)) + fxni*(asmm(3) + asmm(7));
-    MBCOD2 = totCODin - totCODout;
-    MBTNK = totTKNin - totTKNout;
+    MBCODout = totCODin - totCODout;
+    MBTNKout = totTKNin - totTKNout;
 
     % CONVERT UNITS CORRECTLY BACK TO ASM1
     % CODconserved = CODt_anaerobic - Sh2 - Sch4;
     % COD Conversions
-    dCdt(1,15) = asmm(1);
-    dCdt(2,15) = asmm(2);
-    dCdt(3,15) = asmm(3);
-    dCdt(4,15) = asmm(4);
-    dCdt(5,15) = asmm(5);
-    dCdt(6,15) = asmm(6);
-    dCdt(7,15) = asmm(7);
-    dCdt(8,15) = asmm(8);
-    dCdt(9,15) = asmm(9);
-    dCdt(10,15) = asmm(10);
-    dCdt(11,15) = asmm(11);
-    dCdt(12,15) = asmm(12);
-    dCdt(13,15) = asmm(13);
+    dCdt(1,17) = asmm(1);
+    dCdt(2,17) = asmm(2);
+    dCdt(3,17) = asmm(3);
+    dCdt(4,17) = asmm(4);
+    dCdt(5,17) = asmm(5);
+    dCdt(6,17) = asmm(6);
+    dCdt(7,17) = asmm(7);
+    dCdt(8,17) = asmm(8);
+    dCdt(9,17) = asmm(9);
+    dCdt(10,17) = asmm(10);
+    dCdt(11,17) = asmm(11);
+    dCdt(12,17) = asmm(12);
+    dCdt(13,17) = asmm(13);
     i = i + 1;
 end
 vec_len = numel(Conc);
@@ -1674,11 +1752,11 @@ if t == 1
     Array.mleArray = dCdt;
     Array.tArray = t;
     Array.Qarray = Q;
-elseif t >= 1.05
+elseif t >= 1.01
     % Avoid large dataset and quicken solver time by only aquiring data at the specified time span
-    adjT = round(t*100)/100;
-    findT = find(adjT == Var.timespan);
-    if numel(findT) > 0
+    findT = ismembertol(t,Var.timespan,0.001);
+    T_vector = find(findT == 1);
+    if T_vector > 0
         Array.mleArray = [Array.mleArray;dCdt];
         Array.tArray = [Array.tArray;t];
         Array.Qarray = [Array.Qarray;Q];
