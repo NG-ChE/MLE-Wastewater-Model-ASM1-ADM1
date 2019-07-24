@@ -15,8 +15,8 @@ tic
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
-% Getting negative values when converting influent data to ASM1 variables
-    % Find sources for proper conversion
+% Digester going crazy after ~300 days, believed to be from huge TSS load
+% in stream 15 at day 234
 % Carbon balance on AD is wrong and needs to be adjusted for new ASM/ADM
 % conversion implementation
     % Stick to ADM variables to calculate carbon flow
@@ -83,16 +83,19 @@ tv = 0.69;
 VSS = TSS.*tv;
 FSS = TSS - VSS; % fixed suspended solids
 % USING CBOD5 FROM DATA
-BOD5 = InfluentData(:,3); % mg/L
+cBOD5 = InfluentData(:,3); % mg/L
 TKN = InfluentData(:,4); % mg-N/L
 NH3 = InfluentData(:,5); % mg-N/L
 NO3 = InfluentData(:,6); % mg-N/L
+% Convert cBOD to total BOD
+% Source from https://www.wastewaterelearning.com/elearning/pluginfile.php/69/mod_resource/content/4/What%20is%20the%20Difference%20in%20BOD5-CBOD.pdf
+BOD = 1.5*cBOD5 + 4.6*TKN;
 % Alkalinity not given, will have Thursday from Albert
 ALK = InfluentData(:,7); % mg/L
 % % Conversion to ASM1 variables using Biological Wastewater Treatment by
 % % Grady, Daigger, Love and Filipe, from Chapter 9.6
-CODt = 2.1.*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
-CODbo = 1.71.*BOD5; % mgCOD/L, biodegradable COD
+CODt = 2.1.*BOD; % mgCOD/L, Converts BOD5 to total COD, if not available
+CODbo = 1.71.*BOD; % mgCOD/L, biodegradable COD
 CODio = CODt - CODbo; % mgCOD/L, inert COD
 % Xio = 0.375*1.5.*VSS; % mgCOD/L, particulate inert COD
 % Sio = CODio - Xio; % mgCOD/L, soluble inert COD
@@ -236,7 +239,7 @@ while i < (loop_len + 1)
     i = i + 1;
 end
 % Remove dummy AD columns
-Conc_AD(:,1:14) = [];
+%Conc_AD(:,1:14) = [];
 % Set variables
 time = Array.tArray;
 [row,col] = size(Concentration);
@@ -790,8 +793,8 @@ while i < (CompASM + 1)
     n_x = 0.533; % Fraction of TSS left in effluent, taken as average from ST and NT from Appendix B GPS-X files from B&V
     % Determine which components are separated
     % Comment out the two lines below to run constant influent data
-%     Dyn_conc = interp1(Var.Ct,Var.C,t); % Interpolate data set of concentration at specified time
-%     dCdt(i,1) = Dyn_conc(:,i);
+    Dyn_conc = interp1(Var.Ct,Var.C,t); % Interpolate data set of concentration at specified time
+    dCdt(i,1) = Dyn_conc(:,i);
     
     if i < 3
         dCdt(i,2) = dCdt(i,1);
@@ -931,7 +934,7 @@ while i < (CompASM + 1)
         dCdt(i,15) = dCdt(i,13);
     end
     dCdt(i,13) = (dCdt(i,14)*Q(14) + dCdt(i,15)*Q(15))/Q(13);
-    
+    TSS15 = dCdt(3,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15) + dCdt(7,15);
     %% Control parameter for TSS going to AD
     % Causing severe slow down, which results in ODE breaking...
 %     TSSAD = 38000; % g/m3
@@ -1710,7 +1713,7 @@ if t == 1
     Array.mleArray = dCdt;
     Array.tArray = t;
     Array.Qarray = Q;
-    Array.SRT = SRT;
+    Array.TSS15 = TSS15;
 elseif t >= 1.01
     % Avoid large dataset and quicken solver time by only aquiring data at the specified time span
 %     findT = ismembertol(t,Var.timespan,0.00001);
@@ -1721,7 +1724,7 @@ elseif t >= 1.01
         Array.mleArray = [Array.mleArray;dCdt];
         Array.tArray = [Array.tArray;t];
         Array.Qarray = [Array.Qarray;Q];
-        Array.SRT = [Array.SRT;SRT];
+        Array.TSS15 = [Array.TSS15;TSS15];
         assignin('base','Array',Array);
     else
     end
