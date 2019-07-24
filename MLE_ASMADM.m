@@ -15,6 +15,8 @@ tic
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
+% Getting negative values when converting influent data to ASM1 variables
+    % Find sources for proper conversion
 % Carbon balance on AD is wrong and needs to be adjusted for new ASM/ADM
 % conversion implementation
     % Stick to ADM variables to calculate carbon flow
@@ -55,82 +57,76 @@ Var.param = [0.67 0.24 0.08 0.08 ...
 % ADJUST VALUES TO PLANT SPECIFIC DIMENSIONS
 l = IndataADM1_v2;
 
-%% Simulation time span (days)
-% Increase timespan interval for more data points in result section, can
-% signicantly reduce time if interval is very small
-t = 1:0.1:100;
-% Sample rate
-    % Decrease sample rate for better DO control, but ODE takes longer
-sp = 1/5;
-Var.tsample = t + sp*t;
-Var.timespan = t;
+%% Import data for varying influent flow
 
+%data = readtable('simuPlantData.xlsx');
+[status,sheets] = xlsfinfo('simuPlantData.xlsx');
+sumData = [];
+for s = 1:numel(sheets)
+    ...
+    [data,titles] = xlsread('simuPlantData.xlsx',s);
+    sumData = [sumData;data];
+    ...
+end
+% Alkalinity set to 700 
+fixData = sumData;
+fixData(:,7) = 700;
+InfluentData = fillmissing(fixData,'movmedian',100);  
 
 %% Convert typical units coming into plant to ASM1 variables
+% Concentration for each component taken as an average for initial
+% condition of influent, however, it gets overwritten in ODE
 % Units g/m3 = mg/L
-TSS = 204.85; % mg/L
+TSS = InfluentData(:,2); % mg/L
 % If no VSS data, assume VSS/TSS ratio of 0.69 or 0.75
 tv = 0.69;
-VSS = TSS*tv;
+VSS = TSS.*tv;
 FSS = TSS - VSS; % fixed suspended solids
 % USING CBOD5 FROM DATA
-BOD5 = 150.76; % mg/L
-TKN = 44.19; % mg-N/L
-NH3 = 29.1; % mg-N/L
-NO3 = 0.02; % mg-N/L
+BOD5 = InfluentData(:,3); % mg/L
+TKN = InfluentData(:,4); % mg-N/L
+NH3 = InfluentData(:,5); % mg-N/L
+NO3 = InfluentData(:,6); % mg-N/L
 % Alkalinity not given, will have Thursday from Albert
-ALK = 700; % mg-N/L
+ALK = InfluentData(:,7); % mg/L
 % % Conversion to ASM1 variables using Biological Wastewater Treatment by
 % % Grady, Daigger, Love and Filipe, from Chapter 9.6
-CODt = 2.1*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
-CODbo = 1.71*BOD5; % mgCOD/L, biodegradable COD
+CODt = 2.1.*BOD5; % mgCOD/L, Converts BOD5 to total COD, if not available
+CODbo = 1.71.*BOD5; % mgCOD/L, biodegradable COD
 CODio = CODt - CODbo; % mgCOD/L, inert COD
-% % Xio = 0.375*1.5*VSS; % mgCOD/L, particulate inert COD
-% % Sio = CODio - Xio; % mgCOD/L, soluble inert COD
-% % f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
-% % Sso = CODbo*f_readily; % mgCOD/L, readily biodegradable substrate
-% % Xso = CODbo - Sso; % mgCOD/L, slowly biodegradable substrate
-% % ONtotal = TKN - NH3; % mg-N/L, total organic nitrogen
-% % Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
-% % in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
-% % Xnio = in_xd*Xio; % mg-N/L, 
-% % Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
-% % Sndo = Snso_Xnso*(Sso/(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
-% % Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
-Xbho = 0.000000001; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
-Xbao = 0.000000001; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
-Soo = 0; % mgO2/L, oxygen concentration
-Xpo = 0; % mgCOD/L, biomass debris 
-Salko = ALK/100; % mM/L, alkalinity
+% Xio = 0.375*1.5.*VSS; % mgCOD/L, particulate inert COD
+% Sio = CODio - Xio; % mgCOD/L, soluble inert COD
+% f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
+% Sso = CODbo.*f_readily; % mgCOD/L, readily biodegradable substrate
+% Xso = CODbo - Sso; % mgCOD/L, slowly biodegradable substrate
+% ONtotal = TKN - NH3; % mg-N/L, total organic nitrogen
+% Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
+% in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
+% Xnio = in_xd.*Xio; % mg-N/L, 
+% Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
+% Sndo = Snso_Xnso.*(Sso./(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
+% Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
+Xbho = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
+Xbao = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
+Soo = repelem(0,length(InfluentData))'; % mgO2/L, oxygen concentration
+Xpo = repelem(0,length(InfluentData))'; % mgCOD/L, biomass debris 
+Salko = ALK./100; % mM/L, alkalinity
 Snho = NH3; % Initial ammonia
-Snoo = 0; % Initial nitrite/nitrate
+Snoo = NO3; % Initial nitrite/nitrate
 % alt method (pL github)
-Sio = 0.13*CODt;
+Sio = 0.13.*CODt;
 Xio = CODio - Sio;
-Xso = 1.6*VSS - Xio;
+Xso = 1.6.*VSS - Xio;
 Sso = CODbo - Xso;
-nb_TKN = TKN*0.03;
-sol_bio_orgN_ratio = Sso/(Sso+ Xso);
-Sndo = (TKN - Snho - nb_TKN)*(sol_bio_orgN_ratio);
-Xndo = (TKN - Snho - nb_TKN)*(1 - sol_bio_orgN_ratio);
+nb_TKN = TKN.*0.03;
+sol_bio_orgN_ratio = Sso./(Sso+ Xso);
+Sndo = (TKN - Snho - nb_TKN).*(sol_bio_orgN_ratio);
+Xndo = (TKN - Snho - nb_TKN).*(1 - sol_bio_orgN_ratio);
 
 %% Intial conditions for system
-% assume the initial conditions into plant are those of the reactors
-% Since we arent dealing with startup, look to adjust initial conditions for each stream 
-% Sio  = 30; % Soluble inert organic matter
-% Sso  = 69.5; % Readily biodegradable substrate
-% Xio  = 51.2; % Particulate inert organic matter
-% Xso  = 202.32; % Slowly biodegradable substrate
-% Xbho = 28.17; % Active heterotrophic biomass
-% Xbao = 25; % Active autotrophic biomass
-% Xpo  = 0; % Particulate products arising from biomass decay
-% Soo  = 0; % Oxygen
-% Snoo = 0; % Nitrate and nitrite nitrogen
-% Snho = 5; % NH 4+ + NH 3 nitrogen
-% Sndo = 6.95; % Soluble biodegradable organic nitrogen
-% Xndo = 5; % Particulate biodegradable organic nitrogen
-% Salko = 7; % Alkalinity
+MLE_influent = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko];
 MLE_int = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko]; % Create vector of initial values for the MLE system
+MLE_int = mean(MLE_int);
 AD_int = [0.009;... % S_su
 0.0009;...          % S_aa
 0.0009;...          % S_fa 
@@ -172,26 +168,11 @@ x = sys_int(:)*ones(1,17); % Format to an array of [components,streams]
 % steady state simulation
 %x = initialValuesAll(MLE_int);
 
-
-%% Import data for varying influent flow
-dat_dry = importdata('datos/Inf_dry_2006.txt','\t',1);
-dat_rain = importdata('datos/Inf_rain_2006.txt','\t',1);
-dat_strm = importdata('datos/Inf_strm_2006.txt','\t',1);
-
-% Append data
-drydata = dat_dry.data;
-stormdata = dat_strm.data;
-stormdata(:,1) = stormdata(:,1) + drydata(end,1);
-InfluentData = [drydata;stormdata];
-DataTime = InfluentData(:,1);
-
 % Manipulate data for ODE input
 Var.Qt = InfluentData(:,1); % Time, days
 Var.Ct = Var.Qt; % Time, days
-InfluentData(:,1) = []; % Remove column of time data
-Var.Qflow = InfluentData(:,14); % Flow at time, Qt
-InfluentData(:,14) = []; % Remove column of influent flow data
-Var.C = InfluentData; % Conc at time, Ct
+Var.Qflow = InfluentData(:,11); % Flow at time, Qt
+Var.C = MLE_influent; % Conc at time, Ct
 
 % Correct for duplicates in data by adding a small increment to each element
 k = 1;
@@ -207,7 +188,17 @@ Var.Qflow(k) = Var.Qflow(k) + (rand*rand)*1E-3;
 Var.C(k,:) = Var.C(k,:) + (rand*rand)*1E-7;
 k = k + 1;
 end
-  
+
+%% Simulation time span (days)
+% Increase timespan interval for more data points in result section, can
+% signicantly reduce time if interval is very small
+t = 1:0.1:fixData(end,1);
+% Sample rate
+    % Decrease sample rate for better DO control, but ODE takes longer
+sp = 1/5;
+Var.tsample = t + sp*t;
+Var.timespan = t;
+
 %% ODE
 odefunc = @(t,x) MLE(t,x,Var,l);
 opts = odeset('MStateDependence','JPattern');
@@ -391,6 +382,8 @@ P_gas_h2 = S_gas_h2*l.R*l.T_op/16;
 P_gas_ch4 = S_gas_ch4*l.R*l.T_op/64;
 P_gas_co2 = S_gas_co2*l.R*l.T_op;
 
+% Look into changing gas flow equation
+%q_gas = ((l.R*l.T_op)/(P_atm - l.p_gas_h2o))*l.V_liq*((rho_T_8/16) + (rho_T_9/64) + rho_T_10);
 % Gas flow
 P_gas = P_gas_h2 + P_gas_ch4 + P_gas_co2 + l.p_gas_h2o; % Total gas pressure
 q_gas = l.k_p*(P_gas - l.P_atm).*P_gas/l.P_atm; % Total gas flow
@@ -632,8 +625,8 @@ CompADM = 35;
 %% Dynamic flow
 % Constant Plant flow - > testing average data -> using gal/min going into
 % NT flow converted to m3/day
-Qplant = 57622.44668;
-%Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow at specified time
+%Qplant = 57622.44668;
+Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow at specified time
 
 %% Solve flow balance
 if t == 1
@@ -1307,8 +1300,8 @@ while i < (CompASM + 1)
     dCdt(38,15) = S_cat_in;
     dCdt(39,15) = S_an_in;
     % Variable change to check against AD paper
-    l.V_gas = 19.98697; % m3 headspace volume taken from B&V study
-    l.V_liq = Vol6 - l.V_gas; % m3
+    %l.V_gas = 19.98697; % m3 headspace volume taken from B&V study
+    %l.V_liq = Vol6 - l.V_gas; % m3
     
 %% AD differential equations
 % Data/Equations pulled from Aspects on ADM1 implementation within the BSM2 framework
