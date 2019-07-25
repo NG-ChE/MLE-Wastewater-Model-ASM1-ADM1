@@ -1,5 +1,8 @@
 tic
 %% TO-DO
+
+% **Figure out why ammonia is not nitrifying**
+
 % Implement FOG for AD
     % No chemical characeristics given, not sure what to do or if even
     % implement
@@ -59,77 +62,76 @@ l = IndataADM1_v2;
 
 %% Import data for varying influent flow
 
-%data = readtable('simuPlantData.xlsx');
 [status,sheets] = xlsfinfo('simuPlantData.xlsx');
 sumData = [];
 for s = 1:numel(sheets)
-    ...
     [data,titles] = xlsread('simuPlantData.xlsx',s);
     sumData = [sumData;data];
-    ...
 end
 % Alkalinity set to 700 
 fixData = sumData;
 fixData(:,7) = 700;
-InfluentData = fillmissing(fixData,'movmedian',100);  
+InfluentData = fillmissing(fixData,'movmedian',100); 
+% plot(sumData(:,1),InfluentData(:,2:7),'r.-',sumData(:,1),sumData(:,2:7),'b.-') 
+% legend('Filled Missing Data','Original Data')
 
 %% Convert typical units coming into plant to ASM1 variables
 % Concentration for each component taken as an average for initial
 % condition of influent, however, it gets overwritten in ODE
 % Units g/m3 = mg/L
-TSS = InfluentData(:,2); % mg/L
+infChar.TSS = InfluentData(:,2); % mg/L
 % If no VSS data, assume VSS/TSS ratio of 0.69 or 0.75
-tv = 0.69;
-VSS = TSS.*tv;
-FSS = TSS - VSS; % fixed suspended solids
-% USING CBOD5 FROM DATA
-cBOD5 = InfluentData(:,3); % mg/L
-TKN = InfluentData(:,4); % mg-N/L
-NH3 = InfluentData(:,5); % mg-N/L
-NO3 = InfluentData(:,6); % mg-N/L
-% Convert cBOD to total BOD
+infChar.tvRatio = 0.69;
+infChar.VSS = infChar.TSS.*infChar.tvRatio;
+infChar.FSS = infChar.TSS - infChar.VSS; % fixed suspended solids
+% USING CBOD FROM DATA
+infChar.cBOD = InfluentData(:,3); % mg/L
+infChar.TKN = InfluentData(:,4); % mg-N/L
+infChar.NH3 = InfluentData(:,5); % mg-N/L
+infChar.NO3 = InfluentData(:,6); % mg-N/L
+% Convert cBOD to total BOD5
 % Source from https://www.wastewaterelearning.com/elearning/pluginfile.php/69/mod_resource/content/4/What%20is%20the%20Difference%20in%20BOD5-CBOD.pdf
-BOD = 1.5*cBOD5 + 4.6*TKN;
+infChar.BOD = 1.5*infChar.cBOD + 4.6*infChar.TKN;
 % Alkalinity not given, will have Thursday from Albert
-ALK = InfluentData(:,7); % mg/L
+infChar.ALK = InfluentData(:,7); % mg/L
 % % Conversion to ASM1 variables using Biological Wastewater Treatment by
 % % Grady, Daigger, Love and Filipe, from Chapter 9.6
-CODt = 2.1.*BOD; % mgCOD/L, Converts BOD5 to total COD, if not available
-CODbo = 1.71.*BOD; % mgCOD/L, biodegradable COD
-CODio = CODt - CODbo; % mgCOD/L, inert COD
-% Xio = 0.375*1.5.*VSS; % mgCOD/L, particulate inert COD
-% Sio = CODio - Xio; % mgCOD/L, soluble inert COD
-% f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
-% Sso = CODbo.*f_readily; % mgCOD/L, readily biodegradable substrate
-% Xso = CODbo - Sso; % mgCOD/L, slowly biodegradable substrate
-% ONtotal = TKN - NH3; % mg-N/L, total organic nitrogen
-% Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
-% in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
-% Xnio = in_xd.*Xio; % mg-N/L, 
-% Snso_Xnso = ONtotal - Snio - Xnio; % mg-N/L, biodegradable organic nitrogen
-% Sndo = Snso_Xnso.*(Sso./(Sso+Xso)); % mg-N/L, soluble biodegradable nitrogen
-% Xndo = Snso_Xnso - Sndo; % mg-N/L, particulate biodegradable nitrogen
-Xbho = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
-Xbao = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
-Soo = repelem(0,length(InfluentData))'; % mgO2/L, oxygen concentration
-Xpo = repelem(0,length(InfluentData))'; % mgCOD/L, biomass debris 
-Salko = ALK./100; % mM/L, alkalinity
-Snho = NH3; % Initial ammonia
-Snoo = NO3; % Initial nitrite/nitrate
+infChar.CODt = 2.1.*infChar.BOD; % mgCOD/L, Converts BOD5 to total COD, if not available
+infChar.CODbo = 1.71.*infChar.BOD; % mgCOD/L, biodegradable COD
+infChar.CODio = infChar.CODt - infChar.CODbo; % mgCOD/L, inert COD
+% ASM.Xio = 0.375*1.5.*infChar.VSS; % mgCOD/L, particulate inert COD
+% ASM.Sio = infChar.CODio - ASM.Xio; % mgCOD/L, soluble inert COD
+% ASM.f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
+% ASM.Sso = infChar.CODbo.*ASM.f_readily; % mgCOD/L, readily biodegradable substrate
+% ASM.Xso = infChar.CODbo - ASM.Sso; % mgCOD/L, slowly biodegradable substrate
+% ASM.ONtotal = infChar.TKN - infChar.NH3; % mg-N/L, total organic nitrogen
+% ASM.Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
+% ASM.in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
+% ASM.Xnio = ASM.in_xd.*ASM.Xio; % mg-N/L, 
+% ASM.Snso_Xnso = ASM.ONtotal - ASM.Snio - ASM.Xnio; % mg-N/L, biodegradable organic nitrogen
+% ASM.Sndo = ASM.Snso_Xnso.*(ASM.Sso./(ASM.Sso + ASM.Xso)); % mg-N/L, soluble biodegradable nitrogen
+% ASM.Xndo = ASM.Snso_Xnso - ASM.Sndo; % mg-N/L, particulate biodegradable nitrogen
+ASM.Xbho = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
+ASM.Xbao = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
+ASM.Soo = repelem(0,length(InfluentData))'; % mgO2/L, oxygen concentration
+ASM.Xpo = repelem(0,length(InfluentData))'; % mgCOD/L, biomass debris 
+ASM.Salko = infChar.ALK./100; % mM/L, alkalinity
+ASM.Snho = infChar.NH3; % Initial ammonia
+ASM.Snoo = infChar.NO3; % Initial nitrite/nitrate
 % alt method (pL github)
-Sio = 0.13.*CODt;
-Xio = CODio - Sio;
-Xso = 1.6.*VSS - Xio;
-Sso = CODbo - Xso;
-nb_TKN = TKN.*0.03;
-sol_bio_orgN_ratio = Sso./(Sso+ Xso);
-Sndo = (TKN - Snho - nb_TKN).*(sol_bio_orgN_ratio);
-Xndo = (TKN - Snho - nb_TKN).*(1 - sol_bio_orgN_ratio);
+ASM.Sio = 0.13.*infChar.CODt;
+ASM.Xio = infChar.CODio - ASM.Sio;
+ASM.Xso = 1.6.*infChar.VSS - ASM.Xio;
+ASM.Sso = infChar.CODbo - ASM.Xso;
+ASM.nb_TKN = infChar.TKN.*0.03;
+ASM.sol_bio_orgN_ratio = ASM.Sso./(ASM.Sso + ASM.Xso);
+ASM.Sndo = (infChar.TKN - ASM.Snho - ASM.nb_TKN).*(ASM.sol_bio_orgN_ratio);
+ASM.Xndo = (infChar.TKN - ASM.Snho - ASM.nb_TKN).*(1 - ASM.sol_bio_orgN_ratio);
 
 %% Intial conditions for system
-MLE_influent = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko];
-MLE_int = [Sio Sso Xio Xso Xbho Xbao Xpo Soo Snoo Snho Sndo Xndo Salko]; % Create vector of initial values for the MLE system
-MLE_int = mean(MLE_int);
+MLE_influent = [ASM.Sio ASM.Sso ASM.Xio ASM.Xso ASM.Xbho ASM.Xbao ASM.Xpo ...
+    ASM.Soo ASM.Snoo ASM.Snho ASM.Sndo ASM.Xndo ASM.Salko];
+MLE_int = mean(MLE_influent); % Create vector of initial values for the MLE system based on total average
 AD_int = [0.009;... % S_su
 0.0009;...          % S_aa
 0.0009;...          % S_fa 
@@ -166,7 +168,7 @@ AD_int = [0.009;... % S_su
 1.62125;...         % ch4
 0.01411]';          % co2
 % "start up"
-sys_int = [MLE_int AD_int]; % Combine initial conditions
+%sys_int = [MLE_int AD_int]; % Combine initial conditions
 %x = sys_int(:)*ones(1,17); % Format to an array of [components,streams]
 % steady state simulation
 x = initialValuesAll(MLE_int);
@@ -194,8 +196,9 @@ end
 
 %% Simulation time span (days)
 % Increase timespan interval for more data points in result section, can
-% signicantly reduce time if interval is very small
+% signicantly increase time if interval is very small
 t = 1:0.1:fixData(end,1);
+
 % Sample rate
     % Decrease sample rate for better DO control, but ODE takes longer
 sp = 1/5;
@@ -231,18 +234,17 @@ oa_int = na_end + 1; % Start of ADM1 variables
 oa_end = na_end + 35; % End of ADM1 variables
 while i < (loop_len + 1)
     Concentration = [Concentration;arrayManip(na_int:na_end,:)];
-    Conc_AD = [Conc_AD;arrayManip(oa_int:oa_end,:)];
+    Conc_AD = [Conc_AD;arrayManip(oa_int:oa_end,15:17)];
     na_int = oa_end + 1;
     na_end = na_int + 12;
     oa_int = na_end + 1;
     oa_end = na_end + 35;
     i = i + 1;
 end
-% Remove dummy AD columns
-Conc_AD(:,1:14) = [];
+
 % Set variables
 time = Array.tArray;
-[row,col] = size(Concentration);
+[~,col] = size(Concentration);
 
 %% Plotting separate results
 %% MLE + AD Results
@@ -373,34 +375,38 @@ xlabel('Time, days')
 ADMstream.One = reshape(Conc_AD(:,1),[compADM,length(time)])';
 ADMstream.Two = reshape(Conc_AD(:,2),[compADM,length(time)])';
 ADMstream.Three = reshape(Conc_AD(:,3),[compADM,length(time)])';
+
 % Only components in ADMstream.Two should be the Gas components
 % Delete dummy components in the array
 ADMstream.Two(:,1:32) = [];
-S_gas_h2 = ADMstream.Two(:,1);
-S_gas_ch4 = ADMstream.Two(:,2);
-S_gas_co2 = ADMstream.Two(:,3);
+ADMstream.S_gas_h2 = ADMstream.Two(:,1);
+ADMstream.S_gas_ch4 = ADMstream.Two(:,2);
+ADMstream.S_gas_co2 = ADMstream.Two(:,3);
+
 % Determine partial pressures for each gas component, converting CH4 and H2 from kgCOD to
 % kmole C (S_gas_h2/S_gas_ch4)
-P_gas_h2 = S_gas_h2*l.R*l.T_op/16;
-P_gas_ch4 = S_gas_ch4*l.R*l.T_op/64;
-P_gas_co2 = S_gas_co2*l.R*l.T_op;
+ADMstream.P_gas_h2 = ADMstream.S_gas_h2*l.R*l.T_op/16;
+ADMstream.P_gas_ch4 = ADMstream.S_gas_ch4*l.R*l.T_op/64;
+ADMstream.P_gas_co2 = ADMstream.S_gas_co2*l.R*l.T_op;
 
 % Look into changing gas flow equation
 %q_gas = ((l.R*l.T_op)/(P_atm - l.p_gas_h2o))*l.V_liq*((rho_T_8/16) + (rho_T_9/64) + rho_T_10);
 % Gas flow
-P_gas = P_gas_h2 + P_gas_ch4 + P_gas_co2 + l.p_gas_h2o; % Total gas pressure
-q_gas = l.k_p*(P_gas - l.P_atm).*P_gas/l.P_atm; % Total gas flow
+ADMstream.P_gas = ADMstream.P_gas_h2 + ADMstream.P_gas_ch4 + ...
+    ADMstream.P_gas_co2 + l.p_gas_h2o; % Total gas pressure
+ADMstream.q_gas = l.k_p*(ADMstream.P_gas - l.P_atm).* ...
+    ADMstream.P_gas/l.P_atm; % Total gas flow
 
 % Calculate gas component gas flow
-q_gas_h2 = P_gas_h2./P_gas.*q_gas;
-q_gas_ch4 = P_gas_ch4./P_gas.*q_gas;
-q_gas_co2 = P_gas_co2./P_gas.*q_gas;
-q_gas_h2o = l.p_gas_h2o./P_gas.*q_gas;
+ADMstream.q_gas_h2 = ADMstream.P_gas_h2./ADMstream.P_gas.*ADMstream.q_gas;
+ADMstream.q_gas_ch4 = ADMstream.P_gas_ch4./ADMstream.P_gas.*ADMstream.q_gas;
+ADMstream.q_gas_co2 = ADMstream.P_gas_co2./ADMstream.P_gas.*ADMstream.q_gas;
+ADMstream.q_gas_h2o = l.p_gas_h2o./ADMstream.P_gas.*ADMstream.q_gas;
 
 % Mole fraction of gas components
-Py.H2 = P_gas_h2./P_gas;
-Py.CO2 = P_gas_co2./P_gas;
-Py.CH4 = P_gas_ch4./P_gas;
+ADMstream.PyH2 = ADMstream.P_gas_h2./ADMstream.P_gas;
+ADMstream.PyCO2 = ADMstream.P_gas_co2./ADMstream.P_gas;
+ADMstream.PyCH4 = ADMstream.P_gas_ch4./ADMstream.P_gas;
 
 figure(2)
 subplot(2,2,1);
@@ -420,7 +426,7 @@ title('Anaerobic Digester Liquid Effluent')
 ylabel('Concentration, kg/m3')
 xlabel('Time, days')
 subplot(2,2,4);
-plot(time,Py.CH4,time,Py.CO2,time,Py.H2);
+plot(time,ADMstream.PyCH4,time,ADMstream.PyCO2,time,ADMstream.PyH2);
 title('Anaerobic Digester Partial Pressure')
 ylabel('Partial Pressure')
 xlabel('Time, days')
@@ -495,8 +501,8 @@ Carbon.CHBgrams = Carbon.CSI.*Array.Qarray;
 Carbon.CABgrams = Carbon.CSI.*Array.Qarray;
 Carbon.CUBgrams = Carbon.CSI.*Array.Qarray;
 Carbon.CCCgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CSMkgram = Carbon.CSM.*q_gas.*1000; % Convert to grams
-Carbon.CCO2kmoleC = Carbon.CCO2.*q_gas.*1000; % Convert to mol
+Carbon.CSMkgram = Carbon.CSM.*ADMstream.q_gas.*1000; % Convert to grams
+Carbon.CCO2kmoleC = Carbon.CCO2.*ADMstream.q_gas.*1000; % Convert to mol
 
 % Determine total carbon mass flow rate [gC/day] in stream m
 % Multiply carbon fraction by the corresponding carbon component
@@ -628,7 +634,6 @@ CompADM = 35;
 %% Dynamic flow
 % Constant Plant flow - > testing average data -> using gal/min going into
 % NT flow converted to m3/day
-%Qplant = 57622.44668;
 Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow at specified time
 
 %% Solve flow balance
@@ -653,7 +658,7 @@ Q = zeros(1,17);
 % Q(14) = gas flow -> this is generated -> not in mass balance
 % Q(15) = liquid flow
 Q(1) = Qplant;
-Q(3) = 189.27;
+Q(3) = 189.27; 
 Q(2) = Q(1) - Q(3);
 Q(8) = Var.Rir*Q(2);
 Q(12) = Var.Rr*Q(2);
@@ -665,10 +670,7 @@ Q(7) = Q(6) - Q(8);
 Q(9) = Q(7) - Q(10);
 Q(11) = Q(10) - Q(12);
 Q(13) = Q(3) + Q(11);
-Q(15) = ft*Q(13);
-Q(14) = Q(13) - Q(15);
-Q(17) = Q(15);
-Q(16) = 0;
+
 
 % Fixes structure of intial values from vector to an array
 dCdt = reshape(dCdt,[length(dCdt)/length(Q),length(Q)]);
@@ -821,8 +823,6 @@ while i < (CompASM + 1)
     dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); % Mass balance for flow into/out of Primary Clarifier
     %% Recycle split, same concentration
     mass = zeros(13,12);
-    mass(i,2) = Q(2)*dCdt(i,2);
-    mass(i,3) = Q(3)*dCdt(i,3);
     mass(i,6) = Q(6)*dCdt(i,6);
     %disp(mass)
     m_rat_rec = Q(7)/Q(6); % Mass ratio
@@ -869,15 +869,11 @@ while i < (CompASM + 1)
     
     %% Anox/Aer
     dCdt(i,4) = (Q(2)*dCdt(i,2) + Q(8)*dCdt(i,8) + Q(12)*dCdt(i,12))/Q(4); % mixing point
-    
+
     Conc(i,5) = 1/Vol2*(Q(4)*dCdt(i,4) - Q(5)*dCdt(i,5)) + K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8); % Anoxic balance
     Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
     if i == 8
         % Rough control of DO in aeration zone
-%         vectorT = ismembertol(t,Var.timespan,0.00001);
-%         Tfind = find(vectorT == 1);
-        dCdt(10,6);
-        dCdt(8,6);
         if t == 1
             KLa = Var.param(20); % Oxygen transfer coefficient
         else
@@ -886,7 +882,7 @@ while i < (CompASM + 1)
         findT = find(adjT == Var.timespan);
         if numel(findT) > 0
             if dCdt(10,6) > 5
-                KLa = Var.param(20);
+                KLa = 100;
             else
                 KLa = 0;
             end
@@ -908,6 +904,31 @@ while i < (CompASM + 1)
     dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13);
     
     %% Thickener 
+    TSS15 = dCdt(3,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15) + dCdt(7,15);
+    % Need to possible change internval for better control stability
+    maxTSS = 46000;
+    minTSS = 44000;
+    setTSS = 45000;
+    if TSS15 > maxTSS || TSS15 < minTSS
+        ft = (dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13))/(setTSS);
+            if ft > 1
+                ft = 1;
+            elseif ft < 0
+                ft = 0.001;
+            else
+            end
+    else
+    end
+%     % Verify
+%     yyaxis left
+%     plot(Array.tArray,Array.Qarray(:,15));
+%     yyaxis right
+%     plot(Array.tArray,Array.TSS15)
+    Q(15) = ft*Q(13);
+    Q(14) = Q(13) - Q(15);
+    Q(17) = Q(15);
+    Q(16) = 0;
+   
     % Removal efficiency of 0.8 of TSS
     % dCdt(i,15) going to digester
     TSSx = 1 - 0.8;
@@ -934,30 +955,6 @@ while i < (CompASM + 1)
         dCdt(i,15) = dCdt(i,13);
     end
     dCdt(i,13) = (dCdt(i,14)*Q(14) + dCdt(i,15)*Q(15))/Q(13);
-    TSS15 = dCdt(3,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15) + dCdt(7,15);
-    maxTSS = 60000;
-    minTSS = 30000;
-    if t > 1.1
-        if TSS15 < minTSS
-            ft = (dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13))/(minTSS + 8000);
-                if ft > 1
-                    ft = 1;
-                elseif ft < 0
-                    ft = 0.001;
-                else
-                end
-        else
-        end
-%     elseif TSS15 < minTSS
-%         ft = (dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13))/(minTSS + 5000);
-%             if ft > 1
-%                 ft = 1;
-%             elseif ft < 0
-%                 ft = 0.001;
-%             else
-%             end
-    else
-    end
 
     %% Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
     % Maybe optimize for loop
@@ -1724,6 +1721,8 @@ if t == 1
     Array.tArray = t;
     Array.Qarray = Q;
     Array.TSS15 = TSS15;
+    Array.ft = ft;
+    Array.pH = pH;
 elseif t >= 1.01
     % Avoid large dataset and quicken solver time by only aquiring data at the specified time span
 %     findT = ismembertol(t,Var.timespan,0.00001);
@@ -1735,6 +1734,8 @@ elseif t >= 1.01
         Array.tArray = [Array.tArray;t];
         Array.Qarray = [Array.Qarray;Q];
         Array.TSS15 = [Array.TSS15;TSS15];
+        Array.ft = [Array.ft;ft];
+        Array.pH = [Array.pH;pH];
         assignin('base','Array',Array);
     else
     end
