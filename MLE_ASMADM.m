@@ -167,9 +167,9 @@ AD_int = [0.009;... % S_su
 0.01411]';          % co2
 % "start up"
 sys_int = [MLE_int AD_int]; % Combine initial conditions
-x = sys_int(:)*ones(1,17); % Format to an array of [components,streams]
+%x = sys_int(:)*ones(1,17); % Format to an array of [components,streams]
 % steady state simulation
-%x = initialValuesAll(MLE_int);
+x = initialValuesAll(MLE_int);
 
 % Manipulate data for ODE input
 Var.Qt = InfluentData(:,1); % Time, days
@@ -239,7 +239,7 @@ while i < (loop_len + 1)
     i = i + 1;
 end
 % Remove dummy AD columns
-%Conc_AD(:,1:14) = [];
+Conc_AD(:,1:14) = [];
 % Set variables
 time = Array.tArray;
 [row,col] = size(Concentration);
@@ -935,19 +935,29 @@ while i < (CompASM + 1)
     end
     dCdt(i,13) = (dCdt(i,14)*Q(14) + dCdt(i,15)*Q(15))/Q(13);
     TSS15 = dCdt(3,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15) + dCdt(7,15);
-    %% Control parameter for TSS going to AD
-    % Causing severe slow down, which results in ODE breaking...
-%     TSSAD = 38000; % g/m3
-%     % Solve for new flow separation parameter for the required TSS concentration
-%     ft = ((dCdt(3,13) + dCdt(4,13) ...
-%         + dCdt(5,13) ...
-%         + dCdt(6,13) + dCdt(7,13)))/TSSAD;
-%     if ft > 1
-%         ft = 1;
-%     elseif ft < 0
-%         ft = 0.001;
-%     else
-%     end
+    maxTSS = 60000;
+    minTSS = 30000;
+    if t > 1.1
+        if TSS15 < minTSS
+            ft = (dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13))/(minTSS + 8000);
+                if ft > 1
+                    ft = 1;
+                elseif ft < 0
+                    ft = 0.001;
+                else
+                end
+        else
+        end
+%     elseif TSS15 < minTSS
+%         ft = (dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13))/(minTSS + 5000);
+%             if ft > 1
+%                 ft = 1;
+%             elseif ft < 0
+%                 ft = 0.001;
+%             else
+%             end
+    else
+    end
 
     %% Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
     % Maybe optimize for loop
