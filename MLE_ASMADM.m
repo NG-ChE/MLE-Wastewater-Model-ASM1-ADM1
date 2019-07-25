@@ -68,9 +68,10 @@ for s = 1:numel(sheets)
     [data,titles] = xlsread('simuPlantData.xlsx',s);
     sumData = [sumData;data];
 end
-% Alkalinity set to 700 
+% Alkalinity set to 316 mg/L of calcium carbonate
+% Value received from Albert 
 fixData = sumData;
-fixData(:,7) = 700;
+fixData(:,7) = 316;
 InfluentData = fillmissing(fixData,'movmedian',100); 
 % plot(sumData(:,1),InfluentData(:,2:7),'r.-',sumData(:,1),sumData(:,2:7),'b.-') 
 % legend('Filled Missing Data','Original Data')
@@ -115,7 +116,7 @@ ASM.Xbho = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, heterotrophic 
 ASM.Xbao = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
 ASM.Soo = repelem(0,length(InfluentData))'; % mgO2/L, oxygen concentration
 ASM.Xpo = repelem(0,length(InfluentData))'; % mgCOD/L, biomass debris 
-ASM.Salko = infChar.ALK./100; % mM/L, alkalinity
+ASM.Salko = infChar.ALK./100; % mol/L, alkalinity
 ASM.Snho = infChar.NH3; % Initial ammonia
 ASM.Snoo = infChar.NO3; % Initial nitrite/nitrate
 % alt method (pL github)
