@@ -49,10 +49,10 @@ Var.param = [0.67 0.24 0.08 0.08 ...
 0.4 0.3 0.05 0.05 ...
 3 0.1 0.8 100 ...
 10 ...
-1782.92895 ... 416.83 ... % Primary clarifier volume m3 (470,000 gal) taken from B&V
-999.348711 ... 5522.15 ... % Anoxic tank volume m3 (264,000 gal) taken from B&V
-999.348711 ... 36339.95 .... % Aeration tank volume m3 (264,000 gal) taken from B&V
-19229.891863 ... 4803.84 ... % Secondary clarifier volume m3 (5,080,000 gal) taken from B&V
+416.83 ... %1782.92895 ... 416.83 ... % Primary clarifier volume m3 (470,000 gal) taken from B&V
+5522.15 ... %999.348711 ... 5522.15 ... % Anoxic tank volume m3 (264,000 gal) taken from B&V
+36339.95 .... %999.348711 ... 36339.95 .... % Aeration tank volume m3 (264,000 gal) taken from B&V
+4803.84 ... %19229.891863 ... 4803.84 ... % Secondary clarifier volume m3 (5,080,000 gal) taken from B&V
 0 ...
 6056.65888]'; % Digester total volume in m3 (taken as 1.6 MG)
 
@@ -169,10 +169,10 @@ AD_int = [0.009;... % S_su
 1.62125;...         % ch4
 0.01411]';          % co2
 % "start up"
-%sys_int = [MLE_int AD_int]; % Combine initial conditions
-%x = sys_int(:)*ones(1,17); % Format to an array of [components,streams]
+sys_int = [MLE_int AD_int]; % Combine initial conditions
+x = sys_int(:)*ones(1,17); % Format to an array of [components,streams]
 % steady state simulation
-x = initialValuesAll(MLE_int);
+%x = initialValuesAll(MLE_int);
 
 % Manipulate data for ODE input
 Var.Qt = InfluentData(:,1); % Time, days
@@ -198,7 +198,8 @@ end
 %% Simulation time span (days)
 % Increase timespan interval for more data points in result section, can
 % signicantly increase time if interval is very small
-t = 1:0.1:fixData(end,1);
+%t = 1:0.1:fixData(end,1);
+t = 1:0.1:50;
 
 % Sample rate
     % Decrease sample rate for better DO control, but ODE takes longer
@@ -822,14 +823,62 @@ while i < (CompASM + 1)
         dCdt(i,3) = dCdt(i,1);
     end
     dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); % Mass balance for flow into/out of Primary Clarifier
+    
+        %% Anox/Aer
+    for intRec = 1:150
+        if intRec == 1
+        GC8(i,1) = dCdt(i,8);
+        GC12(i,1) = dCdt(i,12);
+        else
+        end
+    dCdt(i,4) = (Q(2)*dCdt(i,2) + Q(8)*GC8(i,intRec) + Q(12)*GC12(i,intRec))/Q(4); % mixing point
+    if i == 8
+    if t == 1
+    KLa = Var.param(20); % Oxygen transfer coefficient
+    else
+    end
+%     maxNH3 = 5;
+%     if dCdt(10,6) > maxNH3
+%         KLa = Var.param(20);
+%     else
+%         KLa = 0;
+%     end
+    else
+    end
+    Conc(i,5) = 1/Vol2*(Q(4)*dCdt(i,4) - Q(5)*dCdt(i,5)) + K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8); % Anoxic balance
+    Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
+    if i == 8
+        % Rough control of DO in aeration zone
+%         if t == 1
+%             KLa = Var.param(20); % Oxygen transfer coefficient
+%         else
+%         end
+%         adjT = round(t*100)/100;
+%         findT = find(adjT == Var.timespan);
+%         if numel(findT) > 0
+%             if dCdt(10,6) > 5
+%                 KLa = 100;
+%             else
+%                 KLa = 0;
+%             end
+%         else
+%         end
+        Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
+    else 
+        Conc(i,6) = Conc(i,6);
+    end
+    % Calculate MCRT
+    TSSas = 0.75*(dCdt(5,6) + dCdt(6,6))*Vol3; % Particulate COD in aeration tank
+    TSSsc = 0.75*(dCdt(5,7) + dCdt(6,7))*Vol4; % Particulate COD in secondary clarifier
+    SLe = TSSas*Q(9);
+    SLw = TSSsc*Q(11);
+    SRT = (TSSas + TSSsc)/(SLe + SLw);
+    
     %% Recycle split, same concentration
-    mass = zeros(13,12);
-    mass(i,6) = Q(6)*dCdt(i,6);
-    %disp(mass)
-    m_rat_rec = Q(7)/Q(6); % Mass ratio
-    dCdt(i,7) = m_rat_rec*mass(i,6)/Q(7); % Recycle Split
-    dCdt(i,8) = (1-m_rat_rec)*mass(i,6)/Q(8); % Recycle Split
 
+    dCdt(i,8) = dCdt(i,6);
+    dCdt(i,7) = dCdt(i,6);
+    
     % Model not worth implementing, values taken from B&V will be used from
     % App. B from GPS-X pdf file
     %% Secondary clarifier model
@@ -863,42 +912,48 @@ while i < (CompASM + 1)
     XCOD10 = dCdt(3,10) + dCdt(4,10) + dCdt(5,10) + dCdt(6,10) + dCdt(7,10); % Particulate COD in waste stream
     
     %% Waste split
-    mass(i,10) = Q(10)*dCdt(i,10);
-    m_rat_SS = Q(11)/Q(10); % Mass ratio
-    dCdt(i,11) = m_rat_SS*mass(i,10)/Q(11); % WAS split
-    dCdt(i,12) = (1-m_rat_SS)*mass(i,10)/Q(12); % RAS split
-    
-    %% Anox/Aer
-    dCdt(i,4) = (Q(2)*dCdt(i,2) + Q(8)*dCdt(i,8) + Q(12)*dCdt(i,12))/Q(4); % mixing point
 
-    Conc(i,5) = 1/Vol2*(Q(4)*dCdt(i,4) - Q(5)*dCdt(i,5)) + K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8); % Anoxic balance
-    Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
-    if i == 8
-        % Rough control of DO in aeration zone
-        if t == 1
-            KLa = Var.param(20); % Oxygen transfer coefficient
-        else
-        end
-        adjT = round(t*100)/100;
-        findT = find(adjT == Var.timespan);
-        if numel(findT) > 0
-            if dCdt(10,6) > 5
-                KLa = 100;
-            else
-                KLa = 0;
-            end
-        else
-        end
-        Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
-    else 
-        Conc(i,6) = Conc(i,6);
+    dCdt(i,11) = dCdt(i,10);
+    dCdt(i,12) = dCdt(i,10);
+    
+    if dCdt(i,8) <= 0 
+        GC8(i,intRec) = 0;
+        err1 = 0;
+    else
+        err1 = 100.*((GC8(i,intRec) - dCdt(i,8))./dCdt(i,8));
     end
-    % Calculate MCRT
-    TSSas = 0.75*(dCdt(5,6) + dCdt(6,6))*Vol3; % Particulate COD in aeration tank
-    TSSsc = 0.75*(dCdt(5,7) + dCdt(6,7))*Vol4; % Particulate COD in secondary clarifier
-    SLe = TSSas*Q(9);
-    SLw = TSSsc*Q(11);
-    SRT = (TSSas + TSSsc)/(SLe + SLw);
+    if dCdt(i,12) <= 0
+        GC12(i,intRec) = 0;
+        err2 = 0;
+    else
+        err2 = 100.*((GC12(i,intRec) - dCdt(i,12))./dCdt(i,12));
+    end
+    format long g
+    table(GC8(i),dCdt(i,8))
+    
+    errT = abs(err1) + abs(err2);
+    tol = 1;
+    if errT > tol
+        if err1 > 0
+            q1 = 0.5;
+            GC8(i,intRec + 1) = q1.*GC8(i,intRec) + (1 - q1)*dCdt(i,8);
+        else
+            q1 = -0.25;
+            GC8(i,intRec + 1) = q1.*GC8(i,intRec) + (1 - q1)*dCdt(i,8);
+        end
+        if err2 > 0
+            q2 = 0.5;
+            GC12(i,intRec + 1) = q2.*GC12(i,intRec) + (1 - q2)*dCdt(i,12);
+        else
+            q2 = -0.25;
+            GC12(i,intRec + 1) = q2.*GC12(i,intRec) + (1 - q2)*dCdt(i,12);
+        end
+    else
+        break
+    end
+    end
+
+
 %% Conversion from ASM1 to ADM1
     % Using paper: Benchmark Simulation Model No.2 (BSM2)
     %% Waste sludge mixing
