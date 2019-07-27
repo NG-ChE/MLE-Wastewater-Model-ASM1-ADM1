@@ -1,8 +1,6 @@
 tic
 %% TO-DO
 
-% **Figure out why ammonia is not nitrifying**
-
 % Implement FOG for AD
     % No chemical characeristics given, not sure what to do or if even
     % implement
@@ -18,8 +16,6 @@ tic
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
-% Digester going crazy after ~300 days, believed to be from huge TSS load
-% in stream 15 at day 234
 % Carbon balance on AD is wrong and needs to be adjusted for new ASM/ADM
 % conversion implementation
     % Stick to ADM variables to calculate carbon flow
