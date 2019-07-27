@@ -198,8 +198,7 @@ end
 %% Simulation time span (days)
 % Increase timespan interval for more data points in result section, can
 % signicantly increase time if interval is very small
-%t = 1:0.1:fixData(end,1);
-t = 1:0.1:50;
+t = 1:0.1:fixData(end,1);
 
 % Sample rate
     % Decrease sample rate for better DO control, but ODE takes longer
@@ -522,18 +521,20 @@ end
 Cflow(:,16) = Carbon.CSMkgram(:,2).*CF.C_S_M + Carbon.CCO2kmoleC(:,2).*12.01; 
 % Convert grams to lbs 
 Cflow = 0.00220462.*Cflow;
+% IGNORE MASS BALANCE CHECK
+    % Dynamic system
 % Mass balance check
 PerError = [];
-PerError(:,1) = 100.*abs(Cflow(:,1) - (Cflow(:,2) + Cflow(:,3)))./Cflow(:,1);
-PerError(:,2) = 100.*abs(Cflow(:,4) - (Cflow(:,12) + Cflow(:,8)+ Cflow(:,2)))./Cflow(:,4);
-PerError(:,3) = 100.*abs(Cflow(:,4) - Cflow(:,5))./Cflow(:,4);
-PerError(:,4) = 100.*abs(Cflow(:,5) - Cflow(:,6))./Cflow(:,5);
-PerError(:,5) = 100.*abs(Cflow(:,6) - (Cflow(:,8) + Cflow(:,7)))./Cflow(:,6);
-PerError(:,6) = 100.*abs(Cflow(:,7) - (Cflow(:,9) + Cflow(:,10)))./Cflow(:,7);
-PerError(:,7) = 100.*abs(Cflow(:,10) - (Cflow(:,12) + Cflow(:,11)))./Cflow(:,10);
-PerError(:,8) = 100.*abs(Cflow(:,1) - (Cflow(:,11) + Cflow(:,9) + Cflow(:,3)))./Cflow(:,1);
-PerError(:,9) = 100.*abs(Cflow(:,13) - (Cflow(:,11) + Cflow(:,3)))./Cflow(:,13);
-PerError(:,10) = 100.*abs(Cflow(:,13) - Cflow(:,15) - Cflow(:,14))./Cflow(:,13);
+PerError(:,1) = 100.*(Cflow(:,1) - (Cflow(:,2) + Cflow(:,3)))./Cflow(:,1);
+PerError(:,2) = 100.*(Cflow(:,4) - (Cflow(:,12) + Cflow(:,8)+ Cflow(:,2)))./Cflow(:,4);
+PerError(:,3) = 100.*(Cflow(:,4) - Cflow(:,5))./Cflow(:,4);
+PerError(:,4) = 100.*(Cflow(:,5) - Cflow(:,6))./Cflow(:,5);
+PerError(:,5) = 100.*(Cflow(:,6) - (Cflow(:,8) + Cflow(:,7)))./Cflow(:,6);
+PerError(:,6) = 100.*(Cflow(:,7) - (Cflow(:,9) + Cflow(:,10)))./Cflow(:,7);
+PerError(:,7) = 100.*(Cflow(:,10) - (Cflow(:,12) + Cflow(:,11)))./Cflow(:,10);
+PerError(:,8) = 100.*(Cflow(:,1) - (Cflow(:,11) + Cflow(:,9) + Cflow(:,3)))./Cflow(:,1);
+PerError(:,9) = 100.*(Cflow(:,13) - (Cflow(:,11) + Cflow(:,3)))./Cflow(:,13);
+PerError(:,10) = 100.*(Cflow(:,13) - Cflow(:,15) - Cflow(:,14))./Cflow(:,13);
 % Ignore Carbon balance on AD for now
 %PerError(:,11) = 100.*abs(C(:,15) - C(:,17) - C(:,16))./C(:,13);
 % Plot percent error
@@ -714,19 +715,19 @@ Vol6 = Var.param(27); % AD volume, taken as two digesters in parallel as per B&V
 
 
 %% Component Identification
-%Si  = dCdt(1,i); % Soluble inert organic matter
-%Ss  = dCdt(2,i); % Readily biodegradable substrate
-%Xi  = dCdt(3,i); % Particulate inert organic matter
-%Xs  = dCdt(4,i); % Slowly biodegradable substrate
-%Xbh = dCdt(5,i); % Active heterotrophic biomass
-%Xba = dCdt(6,i); % Active autotrophic biomass
-%Xp  = dCdt(7,i); % Particulate products arising from biomass decay
-%So  = dCdt(8,i); % Oxygen
-%Sno = dCdt(9,i); % Nitrate and nitrite nitrogen
-%Snh = dCdt(10,i); % NH 4+ + NH 3 nitrogen
-%Snd = dCdt(11,i); % Soluble biodegradable organic nitrogen
-%Xnd = dCdt(12,i); % Particulate biodegradable organic nitrogen
-%Salk = dCdt(13,i); % Alkalinity
+% Si  = dCdt(1,i); % Soluble inert organic matter
+% Ss  = dCdt(2,i); % Readily biodegradable substrate
+% Xi  = dCdt(3,i); % Particulate inert organic matter
+% Xs  = dCdt(4,i); % Slowly biodegradable substrate
+% Xbh = dCdt(5,i); % Active heterotrophic biomass
+% Xba = dCdt(6,i); % Active autotrophic biomass
+% Xp  = dCdt(7,i); % Particulate products arising from biomass decay
+% So  = dCdt(8,i); % Oxygen
+% Sno = dCdt(9,i); % Nitrate and nitrite nitrogen
+% Snh = dCdt(10,i); % NH 4+ + NH 3 nitrogen
+% Snd = dCdt(11,i); % Soluble biodegradable organic nitrogen
+% Xnd = dCdt(12,i); % Particulate biodegradable organic nitrogen
+% Salk = dCdt(13,i); % Alkalinity
 
 %% Stoichiometric matrix
 K =[0 -1/Yh  0  0          1   0      0   -(1-Yh)/Yh       0                     -ixb          0     0                -ixb/14 ;...
@@ -778,6 +779,7 @@ theta2 = [muh*(dCdt(2,6)/(Ks+dCdt(2,6)))*(dCdt(8,6)/(Koh+dCdt(8,6)))*dCdt(5,6);.
 i = 1;
 Conc = zeros(length(dCdt),numel(Q));
 while i < (CompASM + 1)
+    for intRec = 1:150
     % Model won't be used for my plant simulation
     %% Modeling primary clarifier - Otterpohl and Freund 1992
 %     hrt = Vol1/Q(1) % Hydraulic residence time
@@ -797,8 +799,11 @@ while i < (CompASM + 1)
     n_x = 0.533; % Fraction of TSS left in effluent, taken as average from ST and NT from Appendix B GPS-X files from B&V
     % Determine which components are separated
     % Comment out the two lines below to run constant influent data
-    Dyn_conc = interp1(Var.Ct,Var.C,t); % Interpolate data set of concentration at specified time
-    dCdt(i,1) = Dyn_conc(:,i);
+    if intRec == 1
+        Dyn_conc = interp1(Var.Ct,Var.C,t); % Interpolate data set of concentration at specified time
+        dCdt(i,1) = Dyn_conc(:,i);
+    else
+    end
     
     if i < 3
         dCdt(i,2) = dCdt(i,1);
@@ -824,8 +829,7 @@ while i < (CompASM + 1)
     end
     dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); % Mass balance for flow into/out of Primary Clarifier
     
-        %% Anox/Aer
-    for intRec = 1:150
+    %% Anox/Aer
         if intRec == 1
         GC8(i,1) = dCdt(i,8);
         GC12(i,1) = dCdt(i,12);
@@ -878,12 +882,12 @@ while i < (CompASM + 1)
 
     dCdt(i,8) = dCdt(i,6);
     dCdt(i,7) = dCdt(i,6);
-    
+
+    %% Secondary clarifier model
     % Model not worth implementing, values taken from B&V will be used from
     % App. B from GPS-X pdf file
-    %% Secondary clarifier model
     c_x = 0.0015; % Fraction of TSS left in effluent, taken as average from ST and NT of B&V App. B file
-    XCOD7 = dCdt(3,7) + dCdt(4,7) + dCdt(5,7) + dCdt(6,7) + dCdt(7,7); % Particulate COD in influent
+
     if i < 3
         dCdt(i,9) = dCdt(i,7);
     elseif (2 < i) && (i < 8)
@@ -908,14 +912,16 @@ while i < (CompASM + 1)
     end
     
     dCdt(i,7) = (dCdt(i,9)*Q(9) + dCdt(i,10)*Q(10))/Q(7); % Mass balance for flow into/out of Primary Clarifier
-    XCOD9 = dCdt(3,9) + dCdt(4,9) + dCdt(5,9) + dCdt(6,9) + dCdt(7,9); % Particulate COD in effluent
-    XCOD10 = dCdt(3,10) + dCdt(4,10) + dCdt(5,10) + dCdt(6,10) + dCdt(7,10); % Particulate COD in waste stream
     
     %% Waste split
 
     dCdt(i,11) = dCdt(i,10);
     dCdt(i,12) = dCdt(i,10);
     
+    %% Waste sludge mixing
+    dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13);
+    
+    %% Convergence solver
     if dCdt(i,8) <= 0 
         GC8(i,intRec) = 0;
         err1 = 0;
@@ -928,11 +934,11 @@ while i < (CompASM + 1)
     else
         err2 = 100.*((GC12(i,intRec) - dCdt(i,12))./dCdt(i,12));
     end
-    format long g
-    table(GC8(i),dCdt(i,8))
+%     format long g
+%     table(GC8(i),dCdt(i,8))
     
     errT = abs(err1) + abs(err2);
-    tol = 1;
+    tol = 0.01;
     if errT > tol
         if err1 > 0
             q1 = 0.5;
@@ -953,12 +959,8 @@ while i < (CompASM + 1)
     end
     end
 
-
 %% Conversion from ASM1 to ADM1
     % Using paper: Benchmark Simulation Model No.2 (BSM2)
-    %% Waste sludge mixing
-    dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13);
-    
     %% Thickener 
     TSS15 = dCdt(3,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15) + dCdt(7,15);
     % Need to possible change internval for better control stability
