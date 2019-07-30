@@ -1,3 +1,5 @@
+%% Source: https://www.mathworks.com/matlabcentral/fileexchange/7842-catstruct
+
 function A = catstruct(varargin)
 % CATSTRUCT   Concatenate or merge structures with different fieldnames
 %   X = CATSTRUCT(S1,S2,S3,...) merges the structures S1, S2, S3 ...
