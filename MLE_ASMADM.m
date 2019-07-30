@@ -194,8 +194,8 @@ end
 %% Simulation time span (days)
 % Increase timespan interval for more data points in result section, can
 % signicantly increase time if interval is very small
-t = 1:0.1:fixData(end,1);
-
+%t = 1:0.1:fixData(end,1);
+t = 1:0.1:366;
 % Sample rate
     % Decrease sample rate for better DO control, but ODE takes longer
 sp = 1/5;
@@ -269,106 +269,106 @@ ASMstream.Nineteen = reshape(Concentration(:,19),[compASM,length(time)])';
 ASMstream.Twenty = reshape(Concentration(:,20),[compASM,length(time)])';
 
 figure(1)
-subplot(4,5,1)
+subplot(4,4,1)
 plot(time,ASMstream.One)
 title('Plant Influent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,2)
+subplot(4,4,2)
 plot(time,ASMstream.Two)
 title('Primary Clarifier Effluent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,3)
+subplot(4,4,3)
 plot(time,ASMstream.Three)
 title('Primary Clarifier WAS')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,4)
+subplot(4,4,4)
 plot(time,ASMstream.Four)
 title('Mixing Point Before Anoxic Tank')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,5)
+subplot(4,4,5)
 plot(time,ASMstream.Five)
 title('Anoxic Tank Influent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,6)
+subplot(4,4,6)
 plot(time,ASMstream.Six)
 title('Aeration Tank Influent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,7)
+subplot(4,4,7)
 plot(time,ASMstream.Seven)
 title('Aeration Tank Effluent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,8)
+subplot(4,4,8)
 plot(time,ASMstream.Eight)
 title('Internal Recycle')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,9)
+subplot(4,4,9)
 plot(time,ASMstream.Nine)
 title('Secondary Clarifier Effluent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,10)
+subplot(4,4,10)
 plot(time,ASMstream.Ten)
 title('Secondary Clarifier Underflow')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,11)
+subplot(4,4,11)
 plot(time,ASMstream.Eleven)
 title('WAS Stream')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,12)
+subplot(4,4,12)
 plot(time,ASMstream.Twelve)
 title('RAS Stream')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,13)
+subplot(4,4,13)
 plot(time,ASMstream.Thirteen)
 title('Mixing of WAS and PS')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,14)
+subplot(4,4,14)
 plot(time,ASMstream.Fourteen)
 title('Thickener Centrate Stream')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,15)
+subplot(4,4,15)
 plot(time,ASMstream.Fifteen)
 title('Thickener Sludge Stream')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,5,16)
-plot(time,ASMstream.Seventeen)
-title('Digester Sludge Stream')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,5,17)
+% subplot(4,5,16)
+% plot(time,ASMstream.Seventeen)
+% title('Digester Sludge Stream')
+% ylabel('Concentration, mg/L')
+% xlabel('Time, days')
+subplot(4,4,16)
 plot(time,Array.Qarray)
 title('Plant Influent Flowrate')
 ylabel('Volumetric Flow, m3/day')
 xlabel('Time, days')
-subplot(4,5,18)
-plot(time,ASMstream.Nine(:,10))
-title('Secondary Clarifier Ammonia')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,5,19)
-plot(time,ASMstream.Nine(:,9))
-title('Secondary Clarifier Nitrate/Nitrite')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
-subplot(4,5,20)
-plot(time,ASMstream.Nine(:,8))
-title('Secondary Clarifier DO')
-ylabel('Concentration, mg/L')
-xlabel('Time, days')
+% subplot(4,5,18)
+% plot(time,ASMstream.Nine(:,10))
+% title('Secondary Clarifier Ammonia')
+% ylabel('Concentration, mg/L')
+% xlabel('Time, days')
+% subplot(4,5,19)
+% plot(time,ASMstream.Nine(:,9))
+% title('Secondary Clarifier Nitrate/Nitrite')
+% ylabel('Concentration, mg/L')
+% xlabel('Time, days')
+% subplot(4,5,20)
+% plot(time,ASMstream.Nine(:,8))
+% title('Secondary Clarifier DO')
+% ylabel('Concentration, mg/L')
+% xlabel('Time, days')
 
 %% Anaerobic Digester Results
 % Create Array for AD Components
@@ -474,8 +474,9 @@ while p < (length(time) + 1)
     Carbon.CAB = [Carbon.CAB;Concentration(loop.CAB,:)];
     Carbon.CUB = [Carbon.CUB;Concentration(loop.CUB,:)];
     Carbon.CCC = [Carbon.CCC;Concentration(loop.CCC,:)];
-    Carbon.CSM = [Carbon.CSM;Conc_AD(loop.CSM,:)];
-    Carbon.CCO2 = [Carbon.CCO2;Conc_AD(loop.CCO2,:)];
+    % Adjusted to only col 2, was all col before
+    Carbon.CSM = [Carbon.CSM;Conc_AD(loop.CSM,2)];
+    Carbon.CCO2 = [Carbon.CCO2;Conc_AD(loop.CCO2,2)];
     loop.CSI = loop.CCC + 1;
     loop.CSS = loop.CCC + 2;
     loop.CIP = loop.CCC + 3;
@@ -488,16 +489,17 @@ while p < (length(time) + 1)
     loop.CCO2 = loop.CCO2 + 35;
     p = p + 1;
 end 
-% Convert concentration to mass/time 
+% Convert concentration to mass/time
+% Removed extra CSI array, and changed everything besides CSI/CSM/CCO2 to
+% their correct structure name (was all CSI)
 Carbon.CSIgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CSIgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CSSgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CIPgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CSBSgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CHBgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CABgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CUBgrams = Carbon.CSI.*Array.Qarray;
-Carbon.CCCgrams = Carbon.CSI.*Array.Qarray;
+Carbon.CSSgrams = Carbon.CSS.*Array.Qarray;
+Carbon.CIPgrams = Carbon.CIP.*Array.Qarray;
+Carbon.CSBSgrams = Carbon.CSBS.*Array.Qarray;
+Carbon.CHBgrams = Carbon.CHB.*Array.Qarray;
+Carbon.CABgrams = Carbon.CAB.*Array.Qarray;
+Carbon.CUBgrams = Carbon.CUB.*Array.Qarray;
+Carbon.CCCgrams = Carbon.CCC.*Array.Qarray;
 Carbon.CSMgram = Carbon.CSM.*ADMstream.q_gas.*1000; % Convert to grams
 Carbon.CCO2moleC = Carbon.CCO2.*ADMstream.q_gas.*1000; % Convert to mol
 
@@ -508,13 +510,17 @@ m = 1;
 Cflow = ones(length(time),col); % Preallocate array
 while m < (col + 1)
     Cflow(:,m) = Carbon.CSIgrams(:,m).*CF.C_S_I + Carbon.CIPgrams(:,m).*CF.C_I_P + Carbon.CSBSgrams(:,m).*CF.C_SB_S +... 
-    Carbon.CSSgrams(:,m).*CF.C_S_S + Carbon.CCCgrams(:,m).*CF.C_CC+ Carbon.CHBgrams(:,m).*CF.C_HB + Carbon.CABgrams(:,m).*CF.C_AB +...
+    Carbon.CSSgrams(:,m).*CF.C_S_S + Carbon.CCCgrams(:,m).*CF.C_CC + Carbon.CHBgrams(:,m).*CF.C_HB + Carbon.CABgrams(:,m).*CF.C_AB +...
     Carbon.CUBgrams(:,m).*CF.C_UB;
     m = m + 1;
 end
+% Methanol stream, as soluble substrate, will need to pull flow from ODE
+MethC = 1185000; % COD content of methanol g/m3
+QextC = 2; % Flow rate of methanol m3/day
+Cflow(:,21) = MethC*QextC*CF.C_S_S;
 % Adjust for gas stream
 % Convert from COD to grams and mol to grams
-Cflow(:,16) = Carbon.CSMgram(:,2).*CF.C_S_M + Carbon.CCO2moleC(:,2).*12.01; 
+Cflow(:,16) = Carbon.CSMgram.*CF.C_S_M + Carbon.CCO2moleC.*12.01; 
 % Convert grams to lbs 
 Cflow = 0.00220462.*Cflow;
 % IGNORE MASS BALANCE CHECK
@@ -528,10 +534,12 @@ PerError(:,4) = 100.*(Cflow(:,5) - Cflow(:,6))./Cflow(:,5);
 PerError(:,5) = 100.*(Cflow(:,6) - (Cflow(:,8) + Cflow(:,7)))./Cflow(:,6);
 PerError(:,6) = 100.*(Cflow(:,7) - (Cflow(:,9) + Cflow(:,10)))./Cflow(:,7);
 PerError(:,7) = 100.*(Cflow(:,10) - (Cflow(:,12) + Cflow(:,11)))./Cflow(:,10);
-PerError(:,8) = 100.*(Cflow(:,1) - (Cflow(:,11) + Cflow(:,9) + Cflow(:,3)))./Cflow(:,1);
+PerError(:,8) = 100.*((Cflow(:,1) + Cflow(:,21)) - (Cflow(:,16) + Cflow(:,17) + Cflow(:,9) + Cflow(:,19) + Cflow(:,20)))./Cflow(:,1);
 PerError(:,9) = 100.*(Cflow(:,13) - (Cflow(:,11) + Cflow(:,3)))./Cflow(:,13);
 PerError(:,10) = 100.*(Cflow(:,13) - Cflow(:,15) - Cflow(:,14))./Cflow(:,13);
-%PerError(:,11) = 100.*(Cflow(:,15) - Cflow(:,17) - Cflow(:,16))./Cflow(:,15);
+PerError(:,11) = 100.*(Cflow(:,15) - Cflow(:,17) - Cflow(:,16))./Cflow(:,15);
+PerError(:,12) = 100.*((Cflow(:,9) + Cflow(:,21)) - Cflow(:,18))./Cflow(:,9);
+PerError(:,13) = 100.*(Cflow(:,18) - Cflow(:,19) - Cflow(:,20))./Cflow(:,18);
 % Plot percent error
 figure(3)
 plot(time,PerError)
@@ -541,81 +549,86 @@ xlabel('Time, days')
 
 % Plot carbon flow for each stream separately
 figure(4)
-subplot(4,5,1)
+subplot(4,4,1)
 plot(time,Cflow(:,1))
 title('Plant Influent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,2)
+subplot(4,4,2)
 plot(time,Cflow(:,2))
 title('Primary Clarifier Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,3)
+subplot(4,4,3)
 plot(time,Cflow(:,3))
 title('Primary Clarifier WAS')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,4)
+subplot(4,4,4)
 plot(time,Cflow(:,4))
 title('Anoxic Tank Influent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,5)
+subplot(4,4,5)
 plot(time,Cflow(:,5))
 title('Anoxic Tank Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,6)
+subplot(4,4,6)
 plot(time,Cflow(:,6))
 title('Aeration Tank Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,7)
+subplot(4,4,7)
 plot(time,Cflow(:,7))
 title('SC Influent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,8)
+subplot(4,4,8)
 plot(time,Cflow(:,8))
 title('Internal Recycle')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,9)
+subplot(4,4,9)
 plot(time,Cflow(:,9))
 title('SC Effluent')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,10)
+subplot(4,4,10)
 plot(time,Cflow(:,10))
 title('SC Underflow')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,11)
+subplot(4,4,11)
 plot(time,Cflow(:,11))
 title('WAS Stream')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,12)
+subplot(4,4,12)
 plot(time,Cflow(:,12))
 title('RAS Stream')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-subplot(4,5,13)
+subplot(4,4,13)
 plot(time,Cflow(:,13))
 title('Mixing of WAS and PS')
 ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
-% subplot(4,5,16)
-% plot(time,C(:,16))
-% title('Anaerobic Digester Gas Stream')
-% ylabel('Carbon Flow, lb/day')
-% xlabel('Time, days')
-% subplot(4,5,17)
-% plot(time,C(:,17))
-% title('Anaerobic Digester Sludge Stream')
-% ylabel('Carbon Flow, lb/day')
-% xlabel('Time, days')
+subplot(4,4,14)
+plot(time,Cflow(:,16))
+title('Anaerobic Digester Gas Stream')
+ylabel('Carbon Flow, lb/day')
+xlabel('Time, days')
+subplot(4,4,15)
+plot(time,Cflow(:,17))
+title('Anaerobic Digester Sludge Stream')
+ylabel('Carbon Flow, lb/day')
+xlabel('Time, days')
+subplot(4,4,16)
+plot(time,Cflow(:,19))
+title('Plant Effluent')
+ylabel('Carbon Flow, lb/day')
+xlabel('Time, days')
 
 %% Plant Effluent
 figure(5)
@@ -642,6 +655,7 @@ ylabel('Flowrate, m3/day')
 xlabel('Time, days')
 yyaxis right
 plot(time,Array.Qarray(:,15));
+
 
 toc
 resultsToc = toc;
@@ -782,15 +796,15 @@ theta2 = [muh*(dCdt(2,6)/(Ks+dCdt(2,6)))*(dCdt(8,6)/(Koh+dCdt(8,6)))*dCdt(5,6);.
     kh*dCdt(4,6)/dCdt(5,6)/(Kx+dCdt(4,6)/dCdt(5,6))*((dCdt(8,6)/(Koh+dCdt(8,6)))+nh*Koh/(Koh+dCdt(8,6))*dCdt(9,6)/(Kno+dCdt(9,6)))*dCdt(5,6);...
     kh*dCdt(4,6)/dCdt(5,6)/(Kx+dCdt(4,6)/dCdt(5,6))*((dCdt(8,6)/(Koh+dCdt(8,6)))+nh*Koh/(Koh+dCdt(8,6))*dCdt(9,6)/(Kno+dCdt(9,6)))*dCdt(5,6)*dCdt(12,6)/dCdt(4,6)];
 
-% Denite Filter dCdt(i,9)
-theta3 = [muh*(dCdt(2,9)/(Ks+dCdt(2,9)))*(dCdt(8,9)/(Koh+dCdt(8,9)))*dCdt(5,9);...
-    muh*(dCdt(2,9)/(Ks+dCdt(2,9)))*(Koh/(Koh+dCdt(8,9)))*(dCdt(9,9)/(Kno+dCdt(9,9)))*ng*dCdt(5,9);...
-    mua*(dCdt(10,9)/(Knh+dCdt(10,9)))*(dCdt(8,9)/(Koa+dCdt(8,9)))*dCdt(6,9);...
-    bh*dCdt(5,9);...
-    ba*dCdt(6,9);...
-    ka*dCdt(11,9)*dCdt(5,9);...
-    kh*dCdt(4,9)/dCdt(5,9)/(Kx+dCdt(4,9)/dCdt(5,9))*((dCdt(8,9)/(Koh+dCdt(8,9)))+nh*Koh/(Koh+dCdt(8,9))*dCdt(9,9)/(Kno+dCdt(9,9)))*dCdt(5,9);...
-    kh*dCdt(4,9)/dCdt(5,9)/(Kx+dCdt(4,9)/dCdt(5,9))*((dCdt(8,9)/(Koh+dCdt(8,9)))+nh*Koh/(Koh+dCdt(8,9))*dCdt(9,9)/(Kno+dCdt(9,9)))*dCdt(5,9)*dCdt(12,9)/dCdt(4,9)];
+% Denite Filter dCdt(i,18)
+theta3 = [muh*(dCdt(2,18)/(Ks+dCdt(2,18)))*(dCdt(8,18)/(Koh+dCdt(8,18)))*dCdt(5,18);...
+    muh*(dCdt(2,18)/(Ks+dCdt(2,18)))*(Koh/(Koh+dCdt(8,18)))*(dCdt(9,18)/(Kno+dCdt(9,18)))*ng*dCdt(5,18);...
+    mua*(dCdt(10,18)/(Knh+dCdt(10,18)))*(dCdt(8,18)/(Koa+dCdt(8,18)))*dCdt(6,18);...
+    bh*dCdt(5,18);...
+    ba*dCdt(6,18);...
+    ka*dCdt(11,18)*dCdt(5,18);...
+    kh*dCdt(4,18)/dCdt(5,18)/(Kx+dCdt(4,18)/dCdt(5,18))*((dCdt(8,18)/(Koh+dCdt(8,18)))+nh*Koh/(Koh+dCdt(8,18))*dCdt(9,18)/(Kno+dCdt(9,18)))*dCdt(5,18);...
+    kh*dCdt(4,18)/dCdt(5,18)/(Kx+dCdt(4,18)/dCdt(5,18))*((dCdt(8,18)/(Koh+dCdt(8,18)))+nh*Koh/(Koh+dCdt(8,18))*dCdt(9,18)/(Kno+dCdt(9,18)))*dCdt(5,18)*dCdt(12,18)/dCdt(4,18)];
 
 %% MLE mass balance
 % Q(1) - Q(3) - Q(2); % primary clarifier
@@ -860,13 +874,12 @@ while i < (CompASM + 1)
     dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); % Mass balance for flow into/out of Primary Clarifier
     
     %% Anox/Aer
-        if intRec == 1
-        GC8(i,1) = dCdt(i,8);
-        GC12(i,1) = dCdt(i,12);
-        else
-        end
+    if intRec == 1
+    GC8(i,1) = dCdt(i,8);
+    GC12(i,1) = dCdt(i,12);
+    else
+    end
     dCdt(i,4) = (Q(2)*dCdt(i,2) + Q(8)*GC8(i,intRec) + Q(12)*GC12(i,intRec))/Q(4); % mixing point
-    intT = 1;
     if i == 8
         if t == 1
         KLa = Var.param(20); % Oxygen transfer coefficient
@@ -884,21 +897,6 @@ while i < (CompASM + 1)
     Conc(i,5) = 1/Vol2*(Q(4)*dCdt(i,4) - Q(5)*dCdt(i,5)) + K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8); % Anoxic balance
     Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
     if i == 8
-        % Rough control of DO in aeration zone
-%         if t == 1
-%             KLa = Var.param(20); % Oxygen transfer coefficient
-%         else
-%         end
-%         adjT = round(t*100)/100;
-%         findT = find(adjT == Var.timespan);
-%         if numel(findT) > 0
-%             if dCdt(10,6) > 5
-%                 KLa = 100;
-%             else
-%                 KLa = 0;
-%             end
-%         else
-%         end
         Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
     else 
         Conc(i,6) = Conc(i,6);
@@ -952,6 +950,49 @@ while i < (CompASM + 1)
     %% Waste sludge mixing
     dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13);
     
+    %% Denite Filter
+    % External carbon source
+    MethC = 1185000; % COD content of methanol g/m3
+    ExtC = [0 MethC 0 0 0 0 0 0 0 0 0 0 0];
+    QextC = 2; % Flow rate of methanol m3/day
+    Q(18) = Q(9) + QextC;
+    dCdt(i,18) = (Q(9)*dCdt(i,9) + QextC*ExtC(i))/Q(18);
+    
+    Conc(i,18) = 1/Vol5*(Q(9)*dCdt(i,9) - Q(18)*dCdt(i,18)) + K(1,i)*theta3(1) + K(2,i)*theta3(2) + K(3,i)*theta3(3) + K(4,i)*theta3(4) + K(5,i)*theta3(5) + K(6,i)*theta3(6) + K(7,i)*theta3(7) + K(8,i)*theta3(8);
+    
+    %% Denite filter TSS removal
+    % Control variable unknown, Q waste set to 0.05% of inflow
+    Q(20) = 0.0005*Q(18);
+    Q(19) = Q(18) - Q(20);
+    DFx = 1 - 0.9; % 90 percent of solids removed
+    % 19 is effluent
+    % 20 is waste
+    if i < 3
+        dCdt(i,19) = dCdt(i,18);
+    elseif (2 < i) && (i < 8)
+        dCdt(i,19) = DFx*dCdt(i,18)*Q(18)/Q(19);
+    elseif (7 < i) && (i < 12)
+        dCdt(i,19) = dCdt(i,18);
+    elseif (11 < i) && (i < 13)
+        dCdt(i,19) = DFx*dCdt(i,18)*Q(18)/Q(19);
+    else
+        dCdt(i,19) = dCdt(i,18);
+    end
+    if i < 3
+        dCdt(i,20) = dCdt(i,18);
+    elseif (2 < i) && (i < 8)
+        dCdt(i,20) = (1 - DFx)*dCdt(i,18)*Q(18)/Q(20);
+    elseif (7 < i) && (i < 12)
+        dCdt(i,20) = dCdt(i,18);
+    elseif (11 < i) && (i < 13)
+        dCdt(i,20) = (1 - DFx)*dCdt(i,18)*Q(18)/Q(20);
+    else
+        dCdt(i,20) = dCdt(i,18);
+    end
+    
+    dCdt(i,18) = (dCdt(i,19)*Q(19) + dCdt(i,20)*Q(20))/Q(18); % Mass balance across denite filter removal
+
+    
     %% Convergence solver
     if dCdt(i,8) <= 0 
         GC8(i,intRec) = 0;
@@ -992,49 +1033,7 @@ while i < (CompASM + 1)
         return
     end
     
-    %% Denite Filter
-    % External carbon source
-    MethC = 1185000; % COD content of methanol g/m3
-    ExtC = [0 MethC 0 0 0 0 0 0 0 0 0 0 0];
-    QextC = 2; % Flow rate of methanol m3/day
-    Q(18) = Q(9) + QextC;
-    dCdt(i,18) = (Q(9)*dCdt(i,9) + QextC*ExtC(i))/Q(18);
-    
-    Conc(i,18) = 1/Vol5*(Q(9)*dCdt(i,9) - Q(18)*dCdt(i,18)) + K(1,i)*theta3(1) + K(2,i)*theta3(2) + K(3,i)*theta3(3) + K(4,i)*theta3(4) + K(5,i)*theta3(5) + K(6,i)*theta3(6) + K(7,i)*theta3(7) + K(8,i)*theta3(8);
-    
-    %% Denite filter TSS removal
-    % Control variable unknown, Q waste set to 0.05% of inflow
-    Q(20) = 0.0005*Q(18);
-    Q(19) = Q(18) - Q(20);
-    DFx = 1 - 0.9; % 90 percent of solids removed
-    % 20 is effluent
-    % 21 is waste
-    if i < 3
-        dCdt(i,19) = dCdt(i,18);
-    elseif (2 < i) && (i < 8)
-        dCdt(i,19) = DFx*dCdt(i,18)*Q(18)/Q(19);
-    elseif (7 < i) && (i < 12)
-        dCdt(i,19) = dCdt(i,18);
-    elseif (11 < i) && (i < 13)
-        dCdt(i,19) = DFx*dCdt(i,18)*Q(18)/Q(19);
-    else
-        dCdt(i,19) = dCdt(i,18);
-    end
-    if i < 3
-        dCdt(i,20) = dCdt(i,18);
-    elseif (2 < i) && (i < 8)
-        dCdt(i,20) = (1 - DFx)*dCdt(i,18)*Q(18)/Q(20);
-    elseif (7 < i) && (i < 12)
-        dCdt(i,20) = dCdt(i,18);
-    elseif (11 < i) && (i < 13)
-        dCdt(i,20) = (1 - DFx)*dCdt(i,18)*Q(18)/Q(20);
-    else
-        dCdt(i,20) = dCdt(i,18);
-    end
-    
-    dCdt(i,18) = (dCdt(i,19)*Q(19) + dCdt(i,20)*Q(20))/Q(18); % Mass balance across denite filter removal
-
-    %% Thickener 
+    %% Thickener
     TSS15 = dCdt(3,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15) + dCdt(7,15);
     % Need to possible change internval for better control stability
     maxTSS = 46000/1.7;
@@ -1068,7 +1067,7 @@ while i < (CompASM + 1)
     elseif (2 < i) && (i < 8)
         dCdt(i,14) = TSSx*dCdt(i,13)*Q(13)/Q(14);
     elseif (7 < i) && (i < 12)
-        dCdt(i,14) = dCdt(i,1); 
+        dCdt(i,14) = dCdt(i,13); 
     elseif (11 < i) && (i < 13)
         dCdt(i,14) = TSSx*dCdt(i,13)*Q(13)/Q(14);
     else
@@ -1086,8 +1085,7 @@ while i < (CompASM + 1)
         dCdt(i,15) = dCdt(i,13);
     end
     dCdt(i,13) = (dCdt(i,14)*Q(14) + dCdt(i,15)*Q(15))/Q(13);
-
-        
+    
     %% Conversion from ASM1 to ADM1
     % Using paper: Benchmark Simulation Model No.2 (BSM2)
     %% Reducing total incoming COD for Ss,Xs,Xbh,Xba in that specific order
