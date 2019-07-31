@@ -7,7 +7,6 @@ tic
 % Implement primary bypass
 % Implement dewatering(after AD)/dryer(after AD)
     % Thickener implemented
-% Implement denitrification filter
 % Implement proper secondary clarifier model
     % Primary clarifier is done but is not removing enough TSS than
     % whats actually happening at the plant
@@ -16,6 +15,7 @@ tic
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
+% Denitrification filter not doing anything
 % ***** CHECK UNITS *****
 
 clc
@@ -23,7 +23,7 @@ clc
 %% Pull influent parameters from file
 [Var,x] = influentParam(); 
 
-%% AD parameters
+%% Pull AD parameters from file
 % ADJUST VALUES TO PLANT SPECIFIC DIMENSIONS
 l = IndataADM1_v2;
 
@@ -39,9 +39,10 @@ Var.tsample = t + sp*t;
 Var.timespan = t;
 
 %% ODE
+% Calls the MLE function file
 odefunc = @(t,x) MLE(t,x,Var,l);
-opts = odeset('MStateDependence','JPattern');
-ODE_sol = ode15s(odefunc,t,x,opts);
+%opts = odeset('MStateDependence','JPattern');
+ODE_sol = ode15s(odefunc,t,x);%,opts);
 toc
 ODEToc = toc;
 
@@ -57,8 +58,10 @@ CompASM = 13;
 %% Dynamic flow
 % Constant Plant flow - > testing average data -> using gal/min going into
 % NT flow converted to m3/day
-Qplant = interp1(Var.Qt,Var.Qflow,t); % Interpolate data set of volumetric flow at specified time
-%Qplant = 57622.44668;
+% Interpolate data set of volumetric flow at specified time
+Q_NT = interp1(Var.Qt,Var.QflowNT,t); % NorthTrain flow
+%Q_NT = 57622.44668;
+%Q_ST = interp1(Var.Qt,Var.QflowST,t); % SouthTrain flow
 
 %% Solve flow balance
 if t == 1
@@ -86,7 +89,7 @@ Q = zeros(1,20);
 % Q(18) = Denitrification filter stream
 % Q(19) = filtered plant effluent stream
 % Q(20) = filtered waste stream
-Q(1) = Qplant;
+Q(1) = Q_NT;
 Q(3) = 189.27; 
 Q(2) = Q(1) - Q(3);
 Q(8) = Var.Rir*Q(2);
@@ -132,12 +135,16 @@ nh = Var.param(19);
 So_sat = Var.param(21); % gO2/m3
 
 % Equipment volumes
-Vol1 = Var.param(22); % primary clarifier m3, taken L,W,B of one NT clarifier
-Vol2 = Var.param(23); % anoxic m3, taken as total volume of NT anoxic tanks
-Vol3 = Var.param(24); % aeration m3, taken as total volume of NT aeration tanks
-Vol4 = Var.param(25); % secondary clarifier m3, taken as volume of a cylinder, and only one NT clarifier
+Vol1 = Var.param(22); % NT primary clarifier m3, taken L,W,B of one NT clarifier
+Vol2 = Var.param(23); % NT anoxic m3, taken as total volume of NT anoxic tanks
+Vol3 = Var.param(24); % NT aeration m3, taken as total volume of NT aeration tanks
+Vol4 = Var.param(25); % NT secondary clarifier m3, taken as volume of a cylinder, and only one NT clarifier
 Vol5 = Var.param(26); % denit filters m3
 Vol6 = Var.param(27); % AD volume, taken as two digesters in parallel as per B&V study
+Vol7 = 1688.1371; % ST PC, m3
+Vol8 = 4904.42114688; % ST anoxic, m3
+Vol9 = 30283.29427; % ST aeration, m3
+Vol10 = 19215.3873; % ST SC, m3
 
 
 %% Component Identification
@@ -211,7 +218,6 @@ theta3 = [muh*(dCdt(2,18)/(Ks+dCdt(2,18)))*(dCdt(8,18)/(Koh+dCdt(8,18)))*dCdt(5,
 
 %% ODE for MLE system
 % Concentration of component i in stream 1-12
-% K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8) 
 i = 1;
 Conc = zeros(length(dCdt),numel(Q));
 while i < (CompASM + 1)
@@ -220,7 +226,8 @@ while i < (CompASM + 1)
     %% Modeling primary clarifier - Otterpohl and Freund 1992
 %     hrt = Vol1/Q(1) % Hydraulic residence time
 %     n_COD = 2.7*log(hrt*hrt + 9)/100; % Removal efficiency
-%     XCOD1 = dCdt(3,1) + dCdt(4,1) + dCdt(5,1) + dCdt(6,1) + dCdt(7,1); % Particulate COD in influent
+%     % Particulate COD in influent
+%     XCOD1 = dCdt(3,1) + dCdt(4,1) + dCdt(5,1) + dCdt(6,1) + dCdt(7,1); 
 %     CODin = dCdt(1,1) + dCdt(2,1) + XCOD1; % Total COD in influent
 %     n_x = (n_COD*CODin)/XCOD1;
 %     if n_x > 0.95
@@ -232,11 +239,14 @@ while i < (CompASM + 1)
 %     end
 %     n_x = (1-n_x)
     %% TSS removal
-    n_x = 0.533; % Fraction of TSS left in effluent, taken as average from ST and NT from Appendix B GPS-X files from B&V
+    n_x = 0.52506; % Fraction of TSS left in effluent, 
+    % taken as average of TSS in lbs removed from NT 
+    % from Appendix B GPS-X files from B&V
     % Determine which components are separated
     % Comment the following 5 lines out if you want to run steady state
     if intRec == 1
-        Dyn_conc = interp1(Var.Ct,Var.C,t); % Interpolate data set of concentration at specified time
+        % Interpolate data set of concentration at specified time
+        Dyn_conc = interp1(Var.Ct,Var.C,t); 
         dCdt(i,1) = Dyn_conc(:,i);
     else
     end
@@ -263,7 +273,8 @@ while i < (CompASM + 1)
     else
         dCdt(i,3) = dCdt(i,1);
     end
-    dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); % Mass balance for flow into/out of Primary Clarifier
+    % Mass balance for flow into/out of Primary Clarifier
+    dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); 
     
     %% Anox/Aer
     if intRec == 1
@@ -271,7 +282,9 @@ while i < (CompASM + 1)
     GC12(i,1) = dCdt(i,12);
     else
     end
-    dCdt(i,4) = (Q(2)*dCdt(i,2) + Q(8)*GC8(i,intRec) + Q(12)*GC12(i,intRec))/Q(4); % mixing point
+    % mixing point
+    dCdt(i,4) = (Q(2)*dCdt(i,2) + Q(8)*GC8(i,intRec) + ...
+        Q(12)*GC12(i,intRec))/Q(4); 
     if i == 8
         if t == 1
         KLa = Var.param(20); % Oxygen transfer coefficient
@@ -286,19 +299,28 @@ while i < (CompASM + 1)
     else
     end
     
-    Conc(i,5) = 1/Vol2*(Q(4)*dCdt(i,4) - Q(5)*dCdt(i,5)) + K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + K(7,i)*theta1(7) + K(8,i)*theta1(8); % Anoxic balance
-    Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
+    Conc(i,5) = 1/Vol2*(Q(4)*dCdt(i,4) - Q(5)*dCdt(i,5)) + ...
+        K(1,i)*theta1(1) + K(2,i)*theta1(2) + K(3,i)*theta1(3) + ...
+        K(4,i)*theta1(4) + K(5,i)*theta1(5) + K(6,i)*theta1(6) + ...
+        K(7,i)*theta1(7) + K(8,i)*theta1(8); % Anoxic balance
+    Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + ...
+        K(1,i)*theta2(1) + K(2,i)*theta2(2) + K(3,i)*theta2(3) + ...
+        K(4,i)*theta2(4) + K(5,i)*theta2(5) + K(6,i)*theta2(6) + ...
+        K(7,i)*theta2(7) + K(8,i)*theta2(8); % Aeration general balance
     if i == 8
-        Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); % Effect of aeration on the Oxygen concentration
+        % Effect of aeration on the Oxygen concentration
+        Conc(8,6) = Conc(8,6) + KLa*(So_sat - dCdt(8,6)); 
     else 
         Conc(i,6) = Conc(i,6);
     end
-    % Calculate MCRT
-    TSSas = 0.75*(dCdt(5,6) + dCdt(6,6))*Vol3; % Particulate COD in aeration tank
-    TSSsc = 0.75*(dCdt(5,7) + dCdt(6,7))*Vol4; % Particulate COD in secondary clarifier
-    SLe = TSSas*Q(9);
+    
+    %% Calculate MCRT
+    % Particulate COD in aeration tank, grams
+    TSSas = (dCdt(3,6) + dCdt(4,6) + dCdt(5,6) + dCdt(6,6) + dCdt(7,6))*Vol3;
+    % Particulate COD in WAS, g/m3
+    TSSsc = (dCdt(3,11) + dCdt(4,11) + dCdt(5,11) + dCdt(6,11) + dCdt(7,11)); 
     SLw = TSSsc*Q(11);
-    SRT = (TSSas + TSSsc)/(SLe + SLw);
+    MCRT = (TSSas)/(SLw);
     
     %% Recycle split, same concentration
 
@@ -308,7 +330,8 @@ while i < (CompASM + 1)
     %% Secondary clarifier model
     % Model not worth implementing, values taken from B&V will be used from
     % App. B from GPS-X pdf file
-    c_x = 0.0015; % Fraction of TSS left in effluent, taken as average from ST and NT of B&V App. B file
+    c_x = 0.0017; % Fraction of TSS left in effluent, 
+    % taken as lbs of TSS removed from NT of B&V App. B file
 
     if i < 3
         dCdt(i,9) = dCdt(i,7);
@@ -332,8 +355,8 @@ while i < (CompASM + 1)
     else
         dCdt(i,10) = dCdt(i,7);
     end
-
-    dCdt(i,7) = (dCdt(i,9)*Q(9) + dCdt(i,10)*Q(10))/Q(7); % Mass balance for flow into/out of Primary Clarifier
+    % Mass balance for flow into/out of Primary Clarifier
+    dCdt(i,7) = (dCdt(i,9)*Q(9) + dCdt(i,10)*Q(10))/Q(7); 
 
     %% Waste split
     dCdt(i,11) = dCdt(i,10);
@@ -350,7 +373,10 @@ while i < (CompASM + 1)
     Q(18) = Q(9) + QextC;
     dCdt(i,18) = (Q(9)*dCdt(i,9) + QextC*ExtC(i))/Q(18);
     
-    Conc(i,18) = 1/Vol5*(Q(9)*dCdt(i,9) - Q(18)*dCdt(i,18)) + K(1,i)*theta3(1) + K(2,i)*theta3(2) + K(3,i)*theta3(3) + K(4,i)*theta3(4) + K(5,i)*theta3(5) + K(6,i)*theta3(6) + K(7,i)*theta3(7) + K(8,i)*theta3(8);
+    Conc(i,18) = 1/Vol5*(Q(9)*dCdt(i,9) - Q(18)*dCdt(i,18)) + ...
+        K(1,i)*theta3(1) + K(2,i)*theta3(2) + K(3,i)*theta3(3) + ...
+        K(4,i)*theta3(4) + K(5,i)*theta3(5) + K(6,i)*theta3(6) + ...
+        K(7,i)*theta3(7) + K(8,i)*theta3(8);
     
     %% Denite filter TSS removal
     % Control variable unknown, Q waste set to 0.05 percent of inflow
@@ -379,8 +405,8 @@ while i < (CompASM + 1)
     else
         dCdt(i,20) = dCdt(i,18);
     end
-    
-    dCdt(i,18) = (dCdt(i,19)*Q(19) + dCdt(i,20)*Q(20))/Q(18); % Mass balance across denite filter removal
+    % Mass balance across denite filter removal
+    dCdt(i,18) = (dCdt(i,19)*Q(19) + dCdt(i,20)*Q(20))/Q(18); 
 
     %% Convergence solver
     if dCdt(i,8) <= 0 
@@ -422,6 +448,23 @@ while i < (CompASM + 1)
         return
     end
     
+    %% Start ST ODE here, 
+    %% with convergence solver for recycle on anoxic + centrate stream
+    % Primary clarifier
+    s_x = 0.540723; % Fraction of TSS left in effluent, taken as average 
+    % of TSS in lbs removed from ST from Appendix B GPS-X files from B&V
+    % Secondary clarifier
+    b_x = 0.0012354;
+    
+    
+    
+    
+    
+    
+    
+    
+    %% ST done, combine both trains before thickener
+    
     %% Thickener
     TSS15 = dCdt(3,15) + dCdt(4,15) + dCdt(5,15) + dCdt(6,15) + dCdt(7,15);
     % Need to possible change internval for better control stability
@@ -429,7 +472,8 @@ while i < (CompASM + 1)
     minTSS = 44000/1.55;
     setTSS = 45000/1.55;
     if TSS15 > maxTSS || TSS15 < minTSS
-        ft = (dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) + dCdt(7,13))/(setTSS);
+        ft = (dCdt(3,13) + dCdt(4,13) + dCdt(5,13) + dCdt(6,13) ...
+            + dCdt(7,13))/(setTSS);
             if ft > 1
                 ft = 1;
             elseif ft < 0
@@ -488,7 +532,7 @@ while i < (CompASM + 1)
     
     %% Parameters
     tfac = 1/298.15 - 1/(273.15 + 35); % Operating temperature 35C
-    bigr = 0.08314; % R gas constant bar M^-1 K^-1
+    bigr = 0.08314; % R gas constant [bar M^-1 K^-1]
     % CODequiv is the conversion factor for COD demand of nitrate
     % exact value of ASM1 2.86
     CODequiv = 40/14;
@@ -1370,7 +1414,7 @@ if t == 1
     Array.ft = ft;
     Array.pH = pH;
     Array.QgasAlt = q_gasAlt;
-    Array.SRT = SRT;
+    Array.SRT = MCRT;
 elseif t >= 1.01
     % Avoid large dataset and quicken solver time by only aquiring data at the specified time span
 %     findT = ismembertol(t,Var.timespan,0.00001);
@@ -1385,7 +1429,7 @@ elseif t >= 1.01
         Array.ft = [Array.ft;ft];
         Array.pH = [Array.pH;pH];
         Array.QgasAlt = [Array.QgasAlt;q_gasAlt];
-        Array.SRT = [Array.SRT;SRT];
+        Array.SRT = [Array.SRT;MCRT];
         assignin('base','Array',Array);
     else
     end

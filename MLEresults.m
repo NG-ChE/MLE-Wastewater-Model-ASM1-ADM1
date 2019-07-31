@@ -451,6 +451,12 @@ xlabel('Time, days')
 yyaxis right
 plot(time,Array.Qarray(:,15));
 
+figure(6)
+plot(time,Array.SRT)
+title('MCRT')
+ylabel('MCRT, days')
+xlabel('Time, days')
+
 toc
 resultsToc = toc;
 totalTime = ODEToc + resultsToc;

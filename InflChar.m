@@ -115,12 +115,13 @@ sys_int = [MLE_int AD_int]; % Combine initial conditions
 % Manipulate data for ODE input
 Var1.Qt = InfluentData(:,1); % Time, days
 Var1.Ct = Var1.Qt; % Time, days
-Var1.Qflow = InfluentData(:,11); % Flow at time, Qt
+Var1.QflowNT = InfluentData(:,11); % North Train flow m3/day
+Var1.QflowST = InfluentData(:,10); % South train flow m3/day
 Var1.C = MLE_influent; % Conc at time, Ct
 
 % Correct for duplicates in data by adding a small increment to each element
 k = 1;
-    while k < (length(Var1.Qflow)+1)
+    while k < (length(Var1.QflowNT)+1)
         if k == 1
            Var1.Qt(k) = 1; % Set time to exactly 1 to avoid interpolation errors on initial points for Qflow and C in ODE
            Var1.Ct(k) = 1;
@@ -128,7 +129,8 @@ k = 1;
         Var1.Qt(k) = Var1.Qt(k) + (rand*rand)*1E-5 + 1; 
         Var1.Ct(k) = Var1.Qt(k);
         end
-    Var1.Qflow(k) = Var1.Qflow(k) + (rand*rand)*1E-3;
+    Var1.QflowNT(k) = Var1.QflowNT(k) + (rand*rand)*1E-3;
+    Var1.QflowST(k) = Var1.QflowST(k) + (rand*rand)*1E-3;
     Var1.C(k,:) = Var1.C(k,:) + (rand*rand)*1E-7;
     k = k + 1;
     end
