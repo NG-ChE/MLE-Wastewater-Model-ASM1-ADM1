@@ -21,23 +21,27 @@ Var.param = [0.67 0.24 0.08 0.08 ...
 0.4 0.3 0.05 0.05 ...
 3 0.1 0.8 100 ...
 10 ...
-1782.92895 ... % Primary clarifier volume m3 (470,000 gal) taken from B&V
-5522.15 ... % Anoxic tank volume m3 
-36339.95 .... % Aeration tank volume m3 
-19229.891863 ... % Secondary clarifier volume m3 (5,080,000 gal) taken from B&V
+1782.92895 ... % NT Primary clarifier volume m3 (470,000 gal) taken from B&V
+5522.15 ... % NT Anoxic tank volume m3 
+36339.95 .... % NT Aeration tank volume m3 
+19229.891863 ... % NT Secondary clarifier volume m3 (5,080,000 gal) taken from B&V
 916.024*7.13232 ... % Denite filter volume, taken as surface area x depth, values from B&V
-6056.65888]'; % Digester total volume in m3 (taken as 1.6 MG)
+6056.65888 ... % Digester total volume in m3 (taken as 1.6 MG)
+1688.1371 ... % ST PC, m3
+4904.42114688 ... % ST anoxic, m3
+30283.29427 ... % ST aeration, m3
+19215.3873]'; % ST SC, m3
 
 %% Recycle ratios for MLE system
-Var.Rir = 1.88; % Specify internal recycle ratio MLR/PC_effluent 
-Var.Rr = 0.71; % Specify return activated sludge recycle ratio RAS/PC_effluent 
-Var.fsc = 0.974; % Secondary Clarifier underflow separation (has to be less than or equal to 1)
-    if Var.fsc > 1
-        Var.fsc = 1;
-    elseif Var.fsc < 0
-        Var.fsc = 0;
-    else
-    end
+% North Train
+Var.RirNT = 1.85; % Specify internal recycle ratio MLR/PC_influent 
+Var.RrNT = 0.70; % Specify return activated sludge recycle ratio RAS/PC_influent 
+Var.fscNT = 0.974026; % Secondary Clarifier underflow separation (has to be less than or equal to 1)
+% South Train
+Var.RirST = 1.97; % Specify internal recycle ratio MLR/PC_influent 
+Var.RrST = 0.69; % Specify return activated sludge recycle ratio RAS/PC_influent 
+Var.fscST = 0.947867; % Secondary Clarifier underflow separation (has to be less than or equal to 1)
+
 Var.ft = 0.1976; % Flow fraction of concentrated TSS stream with respect to inflow
 
 % "start up"

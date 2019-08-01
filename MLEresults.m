@@ -3,7 +3,7 @@
 % streams, as well as do a carbon mass balance.
 
 
-function [] = MLEresults(Array,ODEToc)
+function [ASMstream,ADMstream,Cflow] = MLEresults(Array,ODEToc)
 tic
 disp('Manipulating large data set, be patient')
 % Get the data for each stream from the column of Concentration, then

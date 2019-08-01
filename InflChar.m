@@ -34,7 +34,8 @@ infChar.NH3 = InfluentData(:,5); % mg-N/L
 infChar.NO3 = InfluentData(:,6); % mg-N/L
 % Convert cBOD to total BOD5
 % Source from https://www.wastewaterelearning.com/elearning/pluginfile.php/69/mod_resource/content/4/What%20is%20the%20Difference%20in%20BOD5-CBOD.pdf
-infChar.BOD = 1.5*infChar.cBOD + 4.6*infChar.TKN;
+infChar.BOD = 1.5.*infChar.cBOD + 4.6.*infChar.TKN;
+%infChar.BOD = infChar.cBOD;
 % Alkalinity not given, will have Thursday from Albert
 infChar.ALK = InfluentData(:,7); % mg/L
 % % Conversion to ASM1 variables using Biological Wastewater Treatment by
@@ -42,18 +43,25 @@ infChar.ALK = InfluentData(:,7); % mg/L
 infChar.CODt = 2.1.*infChar.BOD; % mgCOD/L, Converts BOD5 to total COD, if not available
 infChar.CODbo = 1.71.*infChar.BOD; % mgCOD/L, biodegradable COD
 infChar.CODio = infChar.CODt - infChar.CODbo; % mgCOD/L, inert COD
-% ASM.Xio = 0.375*1.5.*infChar.VSS; % mgCOD/L, particulate inert COD
-% ASM.Sio = infChar.CODio - ASM.Xio; % mgCOD/L, soluble inert COD
-% ASM.f_readily = 0.43; % fraction of biodegradable COD that is readily biodegradable
-% ASM.Sso = infChar.CODbo.*ASM.f_readily; % mgCOD/L, readily biodegradable substrate
-% ASM.Xso = infChar.CODbo - ASM.Sso; % mgCOD/L, slowly biodegradable substrate
-% ASM.ONtotal = infChar.TKN - infChar.NH3; % mg-N/L, total organic nitrogen
-% ASM.Snio = 1.5; % mg-N/L, soluble inert organic nitrogen
-% ASM.in_xd = 0.06; % mass of nitrogen per mass of COD in biomass
-% ASM.Xnio = ASM.in_xd.*ASM.Xio; % mg-N/L, 
-% ASM.Snso_Xnso = ASM.ONtotal - ASM.Snio - ASM.Xnio; % mg-N/L, biodegradable organic nitrogen
-% ASM.Sndo = ASM.Snso_Xnso.*(ASM.Sso./(ASM.Sso + ASM.Xso)); % mg-N/L, soluble biodegradable nitrogen
-% ASM.Xndo = ASM.Snso_Xnso - ASM.Sndo; % mg-N/L, particulate biodegradable nitrogen
+% COD fractions taken from B&V study
+% The collodial fraction of slowly biodegradable COD wasn't taken into
+% account, although this can be implemented by simply multiplying that
+% fraction frcol during the clarifier, or anything TSS related, in the main
+% ODE function. frcol was equal to 0.312 from the study
+
+frsi = 0.11; % Soluble inert fraction of total COD
+frss = 0.1; % Readily biodegradable fraction of total COD
+frxi = 0.09; % Particulate inert fraction of total COD
+% It should be noted that frxi is very low when compared to other
+% wastewater characterstic studies
+frsnh = 0.9; % Ammonium fraction of soluble TKN 
+insi = 0.05; % N content of soluble inert material, gN/gCOD
+inxi = 0.05; % N content of inert particulate material, gN/gCOD
+
+% ASM.Sio = frsi.*infChar.CODt; % mgCOD/L, soluble inert COD
+% ASM.Sso = frss.*infChar.CODt;  % mgCOD/L, readily biodegradable substrate
+% ASM.Xio = frxi.*infChar.CODt; % mgCOD/L, particulate inert COD
+ASM.Xso = (1 - frsi - frss - frxi).*infChar.CODt; % mgCOD/L, slowly biodegradable substrate
 ASM.Xbho = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
 ASM.Xbao = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
 ASM.Soo = repelem(0,length(InfluentData))'; % mgO2/L, oxygen concentration
@@ -61,7 +69,13 @@ ASM.Xpo = repelem(0,length(InfluentData))'; % mgCOD/L, biomass debris
 ASM.Salko = infChar.ALK./100; % mol/L, alkalinity
 ASM.Snho = infChar.NH3; % Initial ammonia
 ASM.Snoo = infChar.NO3; % Initial nitrite/nitrate
-% alt method (pL github)
+% stkn = (ASM.Snho)./frsnh; % Filtered TKN
+% ASM.Sndo = stkn - ASM.Snho - insi.*ASM.Sio; % Soluble organic Nitrogen
+% ASM.Xndo = infChar.TKN - stkn - inxi.*ASM.Xio;
+% % If any are less than zero
+% ASM.Sndo(ASM.Sndo<0) = 0.000000001;
+% ASM.Xndo(ASM.Xndo<0) = 0.000000001;
+ 
 ASM.Sio = 0.13.*infChar.CODt;
 ASM.Xio = infChar.CODio - ASM.Sio;
 ASM.Xso = 1.6.*infChar.VSS - ASM.Xio;
