@@ -3,7 +3,7 @@
 % characteristics (cBOD,TKN,NH3,TSS,ALK), and convert it to ASM1 variables
 
 function [sys_int,Var1] = InflChar()
-%% Import data for varying influent flow
+%% Import data for varying influent flow from excel file
 [~,sheets] = xlsfinfo('simuPlantData.xlsx');
 sumData = [];
     for s = 1:numel(sheets)
@@ -13,10 +13,8 @@ sumData = [];
 % Alkalinity set to 316 mg/L of calcium carbonate
 % Value received from Albert 
 fixData = sumData;
-fixData(:,7) = 316;
+fixData(:,7) = 316*2; % Changed to high alkalinity for now -> due to VERY high increase of nitrate/nitrite in aeration basin
 InfluentData = fillmissing(fixData,'movmedian',100); 
-% plot(sumData(:,1),InfluentData(:,2:7),'r.-',sumData(:,1),sumData(:,2:7),'b.-') 
-% legend('Filled Missing Data','Original Data')
 
 %% Convert typical units coming into plant to ASM1 variables
 % Concentration for each component taken as an average for initial
@@ -32,10 +30,7 @@ infChar.cBOD = InfluentData(:,3); % mg/L
 infChar.TKN = InfluentData(:,4); % mg-N/L
 infChar.NH3 = InfluentData(:,5); % mg-N/L
 infChar.NO3 = InfluentData(:,6); % mg-N/L
-% Convert cBOD to total BOD5
-% Source from https://www.wastewaterelearning.com/elearning/pluginfile.php/69/mod_resource/content/4/What%20is%20the%20Difference%20in%20BOD5-CBOD.pdf
-infChar.BOD = 1.5.*infChar.cBOD + 4.6.*infChar.TKN;
-%infChar.BOD = infChar.cBOD;
+infChar.BOD = infChar.cBOD;
 % Alkalinity not given, will have Thursday from Albert
 infChar.ALK = InfluentData(:,7); % mg/L
 % % Conversion to ASM1 variables using Biological Wastewater Treatment by
@@ -43,6 +38,7 @@ infChar.ALK = InfluentData(:,7); % mg/L
 infChar.CODt = 2.1.*infChar.BOD; % mgCOD/L, Converts BOD5 to total COD, if not available
 infChar.CODbo = 1.71.*infChar.BOD; % mgCOD/L, biodegradable COD
 infChar.CODio = infChar.CODt - infChar.CODbo; % mgCOD/L, inert COD
+
 % COD fractions taken from B&V study
 % The collodial fraction of slowly biodegradable COD wasn't taken into
 % account, although this can be implemented by simply multiplying that
@@ -58,9 +54,9 @@ frsnh = 0.9; % Ammonium fraction of soluble TKN
 insi = 0.05; % N content of soluble inert material, gN/gCOD
 inxi = 0.05; % N content of inert particulate material, gN/gCOD
 
-% ASM.Sio = frsi.*infChar.CODt; % mgCOD/L, soluble inert COD
-% ASM.Sso = frss.*infChar.CODt;  % mgCOD/L, readily biodegradable substrate
-% ASM.Xio = frxi.*infChar.CODt; % mgCOD/L, particulate inert COD
+ASM.Sio = frsi.*infChar.CODt; % mgCOD/L, soluble inert COD
+ASM.Sso = frss.*infChar.CODt;  % mgCOD/L, readily biodegradable substrate
+ASM.Xio = frxi.*infChar.CODt; % mgCOD/L, particulate inert COD
 ASM.Xso = (1 - frsi - frss - frxi).*infChar.CODt; % mgCOD/L, slowly biodegradable substrate
 ASM.Xbho = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
 ASM.Xbao = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
@@ -69,22 +65,13 @@ ASM.Xpo = repelem(0,length(InfluentData))'; % mgCOD/L, biomass debris
 ASM.Salko = infChar.ALK./100; % mol/L, alkalinity
 ASM.Snho = infChar.NH3; % Initial ammonia
 ASM.Snoo = infChar.NO3; % Initial nitrite/nitrate
-% stkn = (ASM.Snho)./frsnh; % Filtered TKN
-% ASM.Sndo = stkn - ASM.Snho - insi.*ASM.Sio; % Soluble organic Nitrogen
-% ASM.Xndo = infChar.TKN - stkn - inxi.*ASM.Xio;
-% % If any are less than zero
-% ASM.Sndo(ASM.Sndo<0) = 0.000000001;
-% ASM.Xndo(ASM.Xndo<0) = 0.000000001;
+stkn = (ASM.Snho)./frsnh; % Filtered TKN
+ASM.Sndo = stkn - ASM.Snho - insi.*ASM.Sio; % Soluble organic Nitrogen
+ASM.Xndo = infChar.TKN - stkn - inxi.*ASM.Xio;
+% If any are less than zero
+ASM.Sndo(ASM.Sndo<0) = 0.000000001;
+ASM.Xndo(ASM.Xndo<0) = 0.000000001;
  
-ASM.Sio = 0.13.*infChar.CODt;
-ASM.Xio = infChar.CODio - ASM.Sio;
-ASM.Xso = 1.6.*infChar.VSS - ASM.Xio;
-ASM.Sso = infChar.CODbo - ASM.Xso;
-ASM.nb_TKN = infChar.TKN.*0.03;
-ASM.sol_bio_orgN_ratio = ASM.Sso./(ASM.Sso + ASM.Xso);
-ASM.Sndo = (infChar.TKN - ASM.Snho - ASM.nb_TKN).*(ASM.sol_bio_orgN_ratio);
-ASM.Xndo = (infChar.TKN - ASM.Snho - ASM.nb_TKN).*(1 - ASM.sol_bio_orgN_ratio);
-
 %% Intial conditions for system
 MLE_influent = [ASM.Sio ASM.Sso ASM.Xio ASM.Xso ASM.Xbho ASM.Xbao ASM.Xpo ...
     ASM.Soo ASM.Snoo ASM.Snho ASM.Sndo ASM.Xndo ASM.Salko];

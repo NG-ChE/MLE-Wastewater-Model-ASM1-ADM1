@@ -41,6 +41,7 @@ time = Array.tArray;
 %% MLE + AD Results
 % Create ASM Plant Stream Structure (Based on ASM1 Variables)
 % Stream 14 is excluded as it is only a gas stream of 3 AD Components
+% North Train
 ASMstream.One = reshape(Concentration(:,1),[compASM,length(time)])';
 ASMstream.Two = reshape(Concentration(:,2),[compASM,length(time)])';
 ASMstream.Three = reshape(Concentration(:,3),[compASM,length(time)])';
@@ -53,116 +54,153 @@ ASMstream.Nine = reshape(Concentration(:,9),[compASM,length(time)])';
 ASMstream.Ten = reshape(Concentration(:,10),[compASM,length(time)])';
 ASMstream.Eleven = reshape(Concentration(:,11),[compASM,length(time)])';
 ASMstream.Twelve = reshape(Concentration(:,12),[compASM,length(time)])';
+% South Train
+ASMstream.TwentyOne = reshape(Concentration(:,21),[compASM,length(time)])';
+ASMstream.TwentyTwo = reshape(Concentration(:,22),[compASM,length(time)])';
+ASMstream.TwentyThree = reshape(Concentration(:,23),[compASM,length(time)])';
+ASMstream.TwentyFour = reshape(Concentration(:,24),[compASM,length(time)])';
+ASMstream.TwentyFive = reshape(Concentration(:,25),[compASM,length(time)])';
+ASMstream.TwentySix = reshape(Concentration(:,26),[compASM,length(time)])';
+ASMstream.TwentySeven = reshape(Concentration(:,27),[compASM,length(time)])';
+ASMstream.TwentyEight = reshape(Concentration(:,28),[compASM,length(time)])';
+ASMstream.TwentyNine = reshape(Concentration(:,29),[compASM,length(time)])';
+ASMstream.Thirty = reshape(Concentration(:,30),[compASM,length(time)])';
+ASMstream.ThirtyOne = reshape(Concentration(:,31),[compASM,length(time)])';
+ASMstream.ThirtyTwo = reshape(Concentration(:,32),[compASM,length(time)])';
+
+% Other Streams
 ASMstream.Thirteen = reshape(Concentration(:,13),[compASM,length(time)])';
 ASMstream.Fourteen = reshape(Concentration(:,14),[compASM,length(time)])';
 ASMstream.Fifteen = reshape(Concentration(:,15),[compASM,length(time)])';
-% ASM1 variables that have been converted from ADM1
-ASMstream.Seventeen = reshape(Concentration(:,17),[compASM,length(time)])';
+% Sixteen is missing due to it only being the digestion gas stream
+ASMstream.Seventeen = reshape(Concentration(:,17),[compASM,length(time)])'; % ASM1 variables that have been converted from ADM1
 ASMstream.Eightteen = reshape(Concentration(:,18),[compASM,length(time)])';
 ASMstream.Nineteen = reshape(Concentration(:,19),[compASM,length(time)])';
 ASMstream.Twenty = reshape(Concentration(:,20),[compASM,length(time)])';
 
-figure(1)
-subplot(4,4,1)
+figure(1) % North train
+subplot(4,3,1)
 plot(time,ASMstream.One)
 title('Plant Influent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,2)
+subplot(4,3,2)
 plot(time,ASMstream.Two)
 title('Primary Clarifier Effluent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,3)
+subplot(4,3,3)
 plot(time,ASMstream.Three)
 title('Primary Clarifier WAS')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,4)
+subplot(4,3,4)
 plot(time,ASMstream.Four)
 title('Mixing Point Before Anoxic Tank')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,5)
+subplot(4,3,5)
 plot(time,ASMstream.Five)
 title('Anoxic Tank Influent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,6)
+subplot(4,3,6)
 plot(time,ASMstream.Six)
 title('Aeration Tank Influent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,7)
+subplot(4,3,7)
 plot(time,ASMstream.Seven)
 title('Aeration Tank Effluent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,8)
+subplot(4,3,8)
 plot(time,ASMstream.Eight)
 title('Internal Recycle')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,9)
+subplot(4,3,9)
 plot(time,ASMstream.Nine)
 title('Secondary Clarifier Effluent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,10)
+subplot(4,3,10)
 plot(time,ASMstream.Ten)
 title('Secondary Clarifier Underflow')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,11)
+subplot(4,3,11)
 plot(time,ASMstream.Eleven)
 title('WAS Stream')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,12)
+subplot(4,3,12)
 plot(time,ASMstream.Twelve)
 title('RAS Stream')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,13)
-plot(time,ASMstream.Thirteen)
-title('Mixing of WAS and PS')
+
+figure(2) % South train 
+subplot(4,3,1)
+plot(time,ASMstream.TwentyOne)
+title('Plant Influent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,14)
-plot(time,ASMstream.Fourteen)
-title('Thickener Centrate Stream')
+subplot(4,3,2)
+plot(time,ASMstream.TwentyTwo)
+title('Primary Clarifier Effluent')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-subplot(4,4,15)
-plot(time,ASMstream.Fifteen)
-title('Thickener Sludge Stream')
+subplot(4,3,3)
+plot(time,ASMstream.TwentyThree)
+title('Primary Clarifier WAS')
 ylabel('Concentration, mg/L')
 xlabel('Time, days')
-% subplot(4,5,16)
-% plot(time,ASMstream.Seventeen)
-% title('Digester Sludge Stream')
-% ylabel('Concentration, mg/L')
-% xlabel('Time, days')
-subplot(4,4,16)
-plot(time,Array.Qarray(:,1))
-title('Plant Influent Flowrate')
-ylabel('Volumetric Flow, m3/day')
+subplot(4,3,4)
+plot(time,ASMstream.TwentyFour)
+title('Mixing Point Before Anoxic Tank')
+ylabel('Concentration, mg/L')
 xlabel('Time, days')
-% subplot(4,5,18)
-% plot(time,ASMstream.Nine(:,10))
-% title('Secondary Clarifier Ammonia')
-% ylabel('Concentration, mg/L')
-% xlabel('Time, days')
-% subplot(4,5,19)
-% plot(time,ASMstream.Nine(:,9))
-% title('Secondary Clarifier Nitrate/Nitrite')
-% ylabel('Concentration, mg/L')
-% xlabel('Time, days')
-% subplot(4,5,20)
-% plot(time,ASMstream.Nine(:,8))
-% title('Secondary Clarifier DO')
-% ylabel('Concentration, mg/L')
-% xlabel('Time, days')
+subplot(4,3,5)
+plot(time,ASMstream.TwentyFive)
+title('Anoxic Tank Influent')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,6)
+plot(time,ASMstream.TwentySix)
+title('Aeration Tank Influent')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,7)
+plot(time,ASMstream.TwentySeven)
+title('Aeration Tank Effluent')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,8)
+plot(time,ASMstream.TwentyEight)
+title('Internal Recycle')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,9)
+plot(time,ASMstream.TwentyNine)
+title('Secondary Clarifier Effluent')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,10)
+plot(time,ASMstream.Thirty)
+title('Secondary Clarifier Underflow')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,11)
+plot(time,ASMstream.ThirtyOne)
+title('WAS Stream')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,12)
+plot(time,ASMstream.ThirtyTwo)
+title('RAS Stream')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
 
 %% Anaerobic Digester Results
 l = IndataADM1_v2; % Read data file
@@ -200,7 +238,7 @@ ADMstream.PyH2 = ADMstream.P_gas_h2./ADMstream.P_gas;
 ADMstream.PyCO2 = ADMstream.P_gas_co2./ADMstream.P_gas;
 ADMstream.PyCH4 = ADMstream.P_gas_ch4./ADMstream.P_gas;
 
-figure(2)
+figure(3)
 subplot(2,2,1);
 plot(time,ADMstream.One);
 title('Anaerobic Digester Influent')
@@ -330,20 +368,20 @@ PerError(:,5) = 100.*(Cflow(:,6) - (Cflow(:,8) + Cflow(:,7)))./Cflow(:,6);
 PerError(:,6) = 100.*(Cflow(:,7) - (Cflow(:,9) + Cflow(:,10)))./Cflow(:,7);
 PerError(:,7) = 100.*(Cflow(:,10) - (Cflow(:,12) + Cflow(:,11)))./Cflow(:,10);
 PerError(:,8) = 100.*((Cflow(:,1) + Cflow(:,21)) - (Cflow(:,16) + Cflow(:,17) + Cflow(:,19) + Cflow(:,20) + Cflow(:,14)))./(Cflow(:,1) + Cflow(:,21)) ;
-PerError(:,9) = 100.*(Cflow(:,13) - (Cflow(:,11) + Cflow(:,3)))./Cflow(:,13);
+PerError(:,9) = 100.*(Cflow(:,13) - (Cflow(:,11) + Cflow(:,3) + Cflow(23) + Cflow(31)))./Cflow(:,13);
 PerError(:,10) = 100.*(Cflow(:,13) - Cflow(:,15) - Cflow(:,14))./Cflow(:,13);
 PerError(:,11) = 100.*(Cflow(:,15) - Cflow(:,17) - Cflow(:,16))./Cflow(:,15);
-PerError(:,12) = 100.*((Cflow(:,9) + Cflow(:,21)) - Cflow(:,18))./((Cflow(:,9) + Cflow(:,21)));
+PerError(:,12) = 100.*((Cflow(:,9) + Cflow(:,21) + Cflow(29)) - Cflow(:,18))./((Cflow(:,9) + Cflow(:,21)));
 PerError(:,13) = 100.*(Cflow(:,18) - Cflow(:,19) - Cflow(:,20))./Cflow(:,18);
 % Plot percent error
-figure(3)
+figure(4)
 plot(time,PerError)
 title('Mass Balance Percent Error')
 ylabel('Error, %')
 xlabel('Time, days')
 
 % Plot carbon flow for each stream separately
-figure(4)
+figure(5)
 subplot(4,4,1)
 plot(time,Cflow(:,1))
 title('Plant Influent')
@@ -426,7 +464,7 @@ ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 
 %% Plant Effluent
-figure(5)
+figure(6)
 subplot(2,2,1)
 plot(time,ASMstream.Nineteen(:,10))
 title('Plant Effluent Ammonia')
@@ -451,10 +489,66 @@ xlabel('Time, days')
 yyaxis right
 plot(time,Array.Qarray(:,15));
 
-figure(6)
-plot(time,Array.SRT)
-title('MCRT')
+figure(7) %% Random plots
+subplot(4,3,1)
+plot(time,Array.SRT_NT)
+title('MCRT NT')
 ylabel('MCRT, days')
+xlabel('Time, days')
+subplot(4,3,2)
+plot(time,ASMstream.Thirteen)
+title('Mixing of WAS and PS')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,3)
+plot(time,ASMstream.Fourteen)
+title('Thickener Centrate Stream')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,4)
+plot(time,ASMstream.Fifteen)
+title('Thickener Sludge Stream')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,5)
+plot(time,ASMstream.Seventeen)
+title('Digester Sludge Stream')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,6)
+plot(time,Array.Qarray(:,1))
+title('Plant Influent Flowrate')
+ylabel('Volumetric Flow, m3/day')
+xlabel('Time, days')
+subplot(4,3,7)
+plot(time,ASMstream.Nine(:,10))
+title('NT Secondary Clarifier Ammonia')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,8)
+plot(time,ASMstream.Nine(:,9))
+title('NT Secondary Clarifier Nitrate/Nitrite')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,9)
+plot(time,ASMstream.Nine(:,8))
+title('NT Secondary Clarifier DO')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,10)
+plot(time,ASMstream.TwentyNine(:,10))
+title('ST Secondary Clarifier Ammonia')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,11)
+plot(time,ASMstream.TwentyNine(:,9))
+title('ST Secondary Clarifier Nitrate/Nitrite')
+ylabel('Concentration, mg/L')
+xlabel('Time, days')
+subplot(4,3,12)
+plot(time,ASMstream.TwentyNine(:,8))
+title('ST Secondary Clarifier DO')
+ylabel('Concentration, mg/L')
 xlabel('Time, days')
 
 toc

@@ -1,6 +1,10 @@
 tic
 %% TO-DO
 
+% Setup convergence for centrate/dewatering stream for ST influent
+% Get new initialvaluesAll steady state results
+% Deal with high oxygen conc.
+
 % Implement FOG for AD
     % No chemical characeristics given, not sure what to do or if even
     % implement
@@ -16,6 +20,7 @@ tic
 
 %% Issues
 % Denitrification filter not doing anything
+    % High nitrate/nitrite and O2 concentration 
 % ***** CHECK UNITS *****
 
 clc
@@ -31,7 +36,7 @@ l = IndataADM1_v2;
 % Increase timespan interval for more data points in result section, can
 % signicantly increase time if interval is very small
 %t = 1:0.1:fixData(end,1);
-t = 1:0.1:366;
+t = 1:0.1:40;
 % Sample rate
     % Decrease sample rate for better DO control, but ODE takes longer
 sp = 1/5;
@@ -53,6 +58,7 @@ function [Conc] = MLE(t,dCdt,Var,l)
 persistent KLa
 persistent Array
 persistent ft
+persistent KLaST
 CompASM = 13;
 
 %% Dynamic flow
@@ -60,17 +66,21 @@ CompASM = 13;
 % NT flow converted to m3/day
 % Interpolate data set of volumetric flow at specified time
 Q_NT = interp1(Var.Qt,Var.QflowNT,t); % NorthTrain flow
-%Q_NT = 57622.44668;
-%Q_ST = interp1(Var.Qt,Var.QflowST,t); % SouthTrain flow
+Q_ST = interp1(Var.Qt,Var.QflowST,t); % SouthTrain flow
 
+%% Average flows for steady state simulation
+% Comment out previous variables for this case
+% Q_NT = 57622.45;
+% Q_ST = 35982.00; 
 %% Solve flow balance
 if t == 1
 ft = Var.ft;
 else
 end
-Q = zeros(1,20);
+Q = zeros(1,32);
 % Stream identification
-% Q(1) = Plant influent
+% North train
+% Q(1) = North train/primary clarifier influent 
 % Q(2) = Primary clarifier effluent
 % Q(3) = Primary clarifier waste sludge
 % Q(4) = Anoxic influent
@@ -82,15 +92,10 @@ Q = zeros(1,20);
 % Q(10) = Secondary clarifier underflow
 % Q(11) = WAS
 % Q(12) = RAS
-% Q(13) = mixing of WAS and PC waste sludge sent to AD
-% Q(14) = centrate stream
-% Q(15) = thickened sludge
-% Q(17) = gas flow -> this is generated -> not in mass balance
-% Q(16) = liquid flow
-% Q(18) = Denitrification filter stream
-% Q(19) = filtered plant effluent stream
-% Q(20) = filtered waste stream
-% Q(21) = Plant influent
+
+% South train
+% Q(35) = South train influent
+% Q(21) = Primary clarifier influent
 % Q(22) = Primary clarifier effluent
 % Q(23) = Primary clarifier waste sludge
 % Q(24) = Anoxic influent
@@ -102,7 +107,21 @@ Q = zeros(1,20);
 % Q(30) = Secondary clarifier underflow
 % Q(31) = WAS
 % Q(32) = RAS
+
+% Other streams
+% Q(13) = mixing of WAS and PC waste sludge sent to thickener
+% Q(14) = centrate stream
+% Q(15) = thickened sludge
+% Q(16) =  gas flow -> this is generated -> not in mass balance
+% Q(17) = liquid flow, sent to dewatering
+% Q(18) = Denitrification filter stream
+% Q(19) = filtered plant effluent stream
+% Q(20) = denit filter waste stream
+% Q(33) = dewatering cake stream
+% Q(34) = dewatering centrate stream
+
 % Flow balance
+
 % North Train
 % Q(1) - Q(3) - Q(2); % primary clarifier
 % Q(2) + Q(8) + Q(12) - Q(4); % inflow to anox 
@@ -111,10 +130,10 @@ Q = zeros(1,20);
 % Q(7) + Q(8) - Q(6); % recycle split
 % Q(9) + Q(10) - Q(7); % secondary clarifier
 % Q(12) + Q(11) - Q(10); % RAS/WAS split
-% Q(3) + Q(11) - Q(13); % Mixing of WAS and primary sludge % ** FIX **
+
 % South Train
-% Q(21) + Q(14) + Q(dewatering) - Q(36); Mixing of Plant flow/ centrate
-% Q(36) - Q(22) - Q(23); % PC
+% Q(35) + Q(14) + Q(dewatering) - Q(21); Mixing of Plant flow/ centrate
+% Q(21) - Q(22) - Q(23); % PC
 % Q(24) - Q(28) - Q(22) - Q(32); % Inflow to anox
 % Q(25) - Q(24); % Anox
 % Q(26) - Q(25); % Aer
@@ -123,15 +142,14 @@ Q = zeros(1,20);
 % Q(32) + Q(31) - Q(30); % RAS/WAS split
 % Q(23) + Q(31) - Q(33); % Mixing of WAS and primary % ** FIX **
 
-% **** -> Q(3) + Q(11) + Q(23) + Q(31) - Q(13) **** what it should be
-
+% Other streams
+% Q(3) + Q(11) + Q(23) + Q(31) - Q(13) % Mixing of WAS and PC sludge from
+% both process trains
 % Q(14) + Q(15) - Q(13); % Thickener balance
 % Q(15) - Q(17); % Digester balance
-% Q(18) - Q(9) - QExtC; % Denite filter, with carbon addition % ** FIX **
-
-% **** -> Q(18) - Q(9) - Q(29) - QExtC **** what it should be
-
+% Q(18) - Q(9) - Q(29) - QExtC % Denite filter
 % Q(20) + Q(19) - Q(18); % Denite filter TSS removal
+
 % North Train
 Q(1) = Q_NT;
 Q(3) = 189.27; % Set waste sludge flow
@@ -145,20 +163,6 @@ Q(6) = Q(5);
 Q(7) = Q(6) - Q(8);
 Q(9) = Q(7) - Q(10);
 Q(11) = Q(10) - Q(12);
-% South Train
-% Q(36) + Q(14) + Q(dewatering) - Q(21);
-% Q(21) - Q(22) - Q(23);
-% Q(24) - Q(28) - Q(22) - Q(32);
-% Q(25) - Q(24);
-% Q(26) - Q(25);
-% Q(27) + Q(28) - Q(26);
-% Q(29) + Q(30) - Q(27); 
-% Q(32) + Q(31) - Q(30); 
-% Q(23) + Q(31) - Q(33);
-
-Q(13) = Q(3) + Q(11);
-
-
 
 % Fixes structure of intial values from vector to an array
 dCdt = reshape(dCdt,[length(dCdt)/length(Q),length(Q)]);
@@ -260,25 +264,25 @@ theta3 = [muh*(dCdt(2,18)/(Ks+dCdt(2,18)))*(dCdt(8,18)/(Koh+dCdt(8,18)))*dCdt(5,
     kh*dCdt(4,18)/dCdt(5,18)/(Kx+dCdt(4,18)/dCdt(5,18))*((dCdt(8,18)/(Koh+dCdt(8,18)))+nh*Koh/(Koh+dCdt(8,18))*dCdt(9,18)/(Kno+dCdt(9,18)))*dCdt(5,18);...
     kh*dCdt(4,18)/dCdt(5,18)/(Kx+dCdt(4,18)/dCdt(5,18))*((dCdt(8,18)/(Koh+dCdt(8,18)))+nh*Koh/(Koh+dCdt(8,18))*dCdt(9,18)/(Kno+dCdt(9,18)))*dCdt(5,18)*dCdt(12,18)/dCdt(4,18)];
 
-% % ST Anoxic tank dCdt(i,25)
-% theta4 = [muh*(dCdt(2,25)/(Ks+dCdt(2,25)))*(dCdt(8,25)/(Koh+dCdt(8,25)))*dCdt(5,25);...
-%     muh*(dCdt(2,25)/(Ks+dCdt(2,25)))*(Koh/(Koh+dCdt(8,25)))*(dCdt(9,25)/(Kno+dCdt(9,25)))*ng*dCdt(5,25);...
-%     mua*(dCdt(10,25)/(Knh+dCdt(10,25)))*(dCdt(8,25)/(Koa+dCdt(8,25)))*dCdt(6,25);...
-%     bh*dCdt(5,25);...
-%     ba*dCdt(6,25);...
-%     ka*dCdt(11,25)*dCdt(5,25);...
-%     kh*dCdt(4,25)/dCdt(5,25)/(Kx+dCdt(4,25)/dCdt(5,25))*((dCdt(8,25)/(Koh+dCdt(8,25)))+nh*Koh/(Koh+dCdt(8,25))*dCdt(9,25)/(Kno+dCdt(9,25)))*dCdt(5,25);...
-%     kh*dCdt(4,25)/dCdt(5,25)/(Kx+dCdt(4,25)/dCdt(5,25))*((dCdt(8,25)/(Koh+dCdt(8,25)))+nh*Koh/(Koh+dCdt(8,25))*dCdt(9,25)/(Kno+dCdt(9,25)))*dCdt(5,25)*dCdt(12,25)/dCdt(4,25)];
-% 
-% % ST Aeration tank dCdt(i,26)
-% theta5 = [muh*(dCdt(2,26)/(Ks+dCdt(2,26)))*(dCdt(8,26)/(Koh+dCdt(8,26)))*dCdt(5,26);...
-%     muh*(dCdt(2,26)/(Ks+dCdt(2,26)))*(Koh/(Koh+dCdt(8,26)))*(dCdt(9,26)/(Kno+dCdt(9,26)))*ng*dCdt(5,26);...
-%     mua*(dCdt(10,26)/(Knh+dCdt(10,26)))*(dCdt(8,26)/(Koa+dCdt(8,26)))*dCdt(6,26);...
-%     bh*dCdt(5,26);...
-%     ba*dCdt(6,26);...
-%     ka*dCdt(11,26)*dCdt(5,26);...
-%     kh*dCdt(4,26)/dCdt(5,26)/(Kx+dCdt(4,26)/dCdt(5,26))*((dCdt(8,26)/(Koh+dCdt(8,26)))+nh*Koh/(Koh+dCdt(8,26))*dCdt(9,26)/(Kno+dCdt(9,26)))*dCdt(5,26);...
-%     kh*dCdt(4,26)/dCdt(5,26)/(Kx+dCdt(4,26)/dCdt(5,26))*((dCdt(8,26)/(Koh+dCdt(8,26)))+nh*Koh/(Koh+dCdt(8,26))*dCdt(9,26)/(Kno+dCdt(9,26)))*dCdt(5,26)*dCdt(12,26)/dCdt(4,26)];
+% ST Anoxic tank dCdt(i,25)
+theta4 = [muh*(dCdt(2,25)/(Ks+dCdt(2,25)))*(dCdt(8,25)/(Koh+dCdt(8,25)))*dCdt(5,25);...
+    muh*(dCdt(2,25)/(Ks+dCdt(2,25)))*(Koh/(Koh+dCdt(8,25)))*(dCdt(9,25)/(Kno+dCdt(9,25)))*ng*dCdt(5,25);...
+    mua*(dCdt(10,25)/(Knh+dCdt(10,25)))*(dCdt(8,25)/(Koa+dCdt(8,25)))*dCdt(6,25);...
+    bh*dCdt(5,25);...
+    ba*dCdt(6,25);...
+    ka*dCdt(11,25)*dCdt(5,25);...
+    kh*dCdt(4,25)/dCdt(5,25)/(Kx+dCdt(4,25)/dCdt(5,25))*((dCdt(8,25)/(Koh+dCdt(8,25)))+nh*Koh/(Koh+dCdt(8,25))*dCdt(9,25)/(Kno+dCdt(9,25)))*dCdt(5,25);...
+    kh*dCdt(4,25)/dCdt(5,25)/(Kx+dCdt(4,25)/dCdt(5,25))*((dCdt(8,25)/(Koh+dCdt(8,25)))+nh*Koh/(Koh+dCdt(8,25))*dCdt(9,25)/(Kno+dCdt(9,25)))*dCdt(5,25)*dCdt(12,25)/dCdt(4,25)];
+
+% ST Aeration tank dCdt(i,26)
+theta5 = [muh*(dCdt(2,26)/(Ks+dCdt(2,26)))*(dCdt(8,26)/(Koh+dCdt(8,26)))*dCdt(5,26);...
+    muh*(dCdt(2,26)/(Ks+dCdt(2,26)))*(Koh/(Koh+dCdt(8,26)))*(dCdt(9,26)/(Kno+dCdt(9,26)))*ng*dCdt(5,26);...
+    mua*(dCdt(10,26)/(Knh+dCdt(10,26)))*(dCdt(8,26)/(Koa+dCdt(8,26)))*dCdt(6,26);...
+    bh*dCdt(5,26);...
+    ba*dCdt(6,26);...
+    ka*dCdt(11,26)*dCdt(5,26);...
+    kh*dCdt(4,26)/dCdt(5,26)/(Kx+dCdt(4,26)/dCdt(5,26))*((dCdt(8,26)/(Koh+dCdt(8,26)))+nh*Koh/(Koh+dCdt(8,26))*dCdt(9,26)/(Kno+dCdt(9,26)))*dCdt(5,26);...
+    kh*dCdt(4,26)/dCdt(5,26)/(Kx+dCdt(4,26)/dCdt(5,26))*((dCdt(8,26)/(Koh+dCdt(8,26)))+nh*Koh/(Koh+dCdt(8,26))*dCdt(9,26)/(Kno+dCdt(9,26)))*dCdt(5,26)*dCdt(12,26)/dCdt(4,26)];
 
 
 %% ODE for MLE system
@@ -286,9 +290,8 @@ theta3 = [muh*(dCdt(2,18)/(Ks+dCdt(2,18)))*(dCdt(8,18)/(Koh+dCdt(8,18)))*dCdt(5,
 i = 1;
 Conc = zeros(length(dCdt),numel(Q));
 while i < (CompASM + 1)
-    for intRec = 1:50
-    % Model won't be used for my plant simulation
     %% Modeling primary clarifier - Otterpohl and Freund 1992
+    % Model won't be used for my plant simulation
 %     hrt = Vol1/Q(1) % Hydraulic residence time
 %     n_COD = 2.7*log(hrt*hrt + 9)/100; % Removal efficiency
 %     % Particulate COD in influent
@@ -309,12 +312,9 @@ while i < (CompASM + 1)
     % from Appendix B GPS-X files from B&V
     % Determine which components are separated
     % Comment the following 5 lines out if you want to run steady state
-    if intRec == 1
-        % Interpolate data set of concentration at specified time
-        Dyn_conc = interp1(Var.Ct,Var.C,t); 
-        dCdt(i,1) = Dyn_conc(:,i);
-    else
-    end
+    % Interpolate data set of concentration at specified time
+    Dyn_conc = interp1(Var.Ct,Var.C,t); 
+    dCdt(i,1) = Dyn_conc(:,i);
     
     if i < 3
         dCdt(i,2) = dCdt(i,1);
@@ -341,6 +341,7 @@ while i < (CompASM + 1)
     % Mass balance for flow into/out of Primary Clarifier
     dCdt(i,2) = (dCdt(i,1)*Q(1) - dCdt(i,3)*Q(3))/Q(2); 
     
+    for intRec = 1:50
     %% Anox/Aer
     if intRec == 1
     GC8(i,1) = dCdt(i,8);
@@ -450,130 +451,196 @@ while i < (CompASM + 1)
         return
     end
     
-    %% Calculate MCRT
+    %% Calculate MCRT north train
     % Particulate COD in aeration tank, grams
     TSSas = (dCdt(3,6) + dCdt(4,6) + dCdt(5,6) + dCdt(6,6) + dCdt(7,6))*Vol3;
     % Particulate COD in WAS, g/m3
     TSSsc = (dCdt(3,11) + dCdt(4,11) + dCdt(5,11) + dCdt(6,11) + dCdt(7,11)); 
     SLw = TSSsc*Q(11);
-    MCRT = (TSSas)/(SLw);
+    MCRT_NT = (TSSas)/(SLw);
     
-    %% Start ST ODE here -> NEED TO MAKE SURE FLOWS ARE SETUP CORRECTLY FOR THE CONVERGENCE
+    %% South train
     % Need to guess Q(14) and Q(dewatering)
-    % Q(36) = Q_ST;
-    % Q(14) = GQ14; % Guess, **dont set that actually equal to**
-    % Q(35) = GQ35; % Guess
-    % Q(21) = Q(36) + GQ14 + GQ35
-    % Q(23) = 189.27; % Set waste sludge flow
-    % Q(22) = Q(21) - Q(23);
+    % SET PLANT INFLUENT FLOW OUTSIDE OF COMPASM LOOP
+    % Q(35) = Q_ST; 
+    % GQ14 = 1000; % Guess 
+    % GQ35 = 200; % Guess
+    Q(21) = Q_ST;%Q(35) + GQ14 + GQ35
+    dCdt(i,21) = Dyn_conc(:,i); % Same concentration as north train
+    Q(23) = 189.27; % Set waste sludge flow m3/day
+    Q(22) = Q(21) - Q(23);
+    Q(28) = Var.RirST*Q(22);
+    Q(32) = Var.RrST*Q(22);
+    Q(30) = Q(32)/Var.fscST;
+    Q(24) = Q(22) + Q(28) + Q(32);
+    Q(25) = Q(24);
+    Q(26) = Q(25);
+    Q(27) = Q(26) - Q(28);
+    Q(29) = Q(27) - Q(30);
+    Q(31) = Q(30) - Q(32);
     %% with convergence solver for recycle on anoxic + centrate stream
     % Primary clarifier
-    %s_x = 0.540723; % Fraction of TSS left in effluent, taken as average 
+    s_x = 0.540723; % Fraction of TSS left in effluent, taken as average 
     % of TSS in lbs removed from ST from Appendix B GPS-X files from B&V
-%         DynC = interp1(Var.Ct,Var.C,t); 
-%         dCdt(i,21) = DynC(:,i);
-%     if i < 3
-%         dCdt(i,22) = dCdt(i,21);
-%     elseif (2 < i) && (i < 8)
-%         dCdt(i,22) = s_x*dCdt(i,21)*Q(21)/Q(22);
-%     elseif (7 < i) && (i < 12)
-%         dCdt(i,22) = dCdt(i,21); 
-%     elseif (11 < i) && (i < 13)
-%         dCdt(i,22) = s_x*dCdt(i,21)*Q(21)/Q(22);
-%     else
-%         dCdt(i,22) = dCdt(i,21);
-%     end
-%     if i < 3
-%         dCdt(i,23) = dCdt(i,21);
-%     elseif (2 < i) && (i < 8)
-%         dCdt(i,23) = (1 - s_x)*dCdt(i,21)*Q(21)/Q(23);
-%     elseif (7 < i) && (i < 12)
-%         dCdt(i,23) = dCdt(i,21);
-%     elseif (11 < i) && (i < 13)
-%         dCdt(i,23) = (1 - s_x)*dCdt(i,21)*Q(21)/Q(23);
-%     else
-%         dCdt(i,23) = dCdt(i,21);
-%     end
-%     % Mass balance for flow into/out of Primary Clarifier
-%     dCdt(i,22) = (dCdt(i,1)*Q(21) - dCdt(i,23)*Q(23))/Q(22); 
-    
-%     % mixing point
-%     dCdt(i,24) = (Q(22)*dCdt(i,22) + Q(28)*GC8(i,intRec) + ...
-%         Q(32)*GC12(i,intRec))/Q(24); 
+    if i < 3
+        dCdt(i,22) = dCdt(i,21);
+    elseif (2 < i) && (i < 8)
+        dCdt(i,22) = s_x*dCdt(i,21)*Q(21)/Q(22);
+    elseif (7 < i) && (i < 12)
+        dCdt(i,22) = dCdt(i,21); 
+    elseif (11 < i) && (i < 13)
+        dCdt(i,22) = s_x*dCdt(i,21)*Q(21)/Q(22);
+    else
+        dCdt(i,22) = dCdt(i,21);
+    end
+    if i < 3
+        dCdt(i,23) = dCdt(i,21);
+    elseif (2 < i) && (i < 8)
+        dCdt(i,23) = (1 - s_x)*dCdt(i,21)*Q(21)/Q(23);
+    elseif (7 < i) && (i < 12)
+        dCdt(i,23) = dCdt(i,21);
+    elseif (11 < i) && (i < 13)
+        dCdt(i,23) = (1 - s_x)*dCdt(i,21)*Q(21)/Q(23);
+    else
+        dCdt(i,23) = dCdt(i,21);
+    end
+    % Mass balance for flow into/out of Primary Clarifier
+    dCdt(i,22) = (dCdt(i,21)*Q(21) - dCdt(i,23)*Q(23))/Q(22); 
 
-%     Conc(i,25) = 1/Vol8*(Q(24)*dCdt(i,24) - Q(5)*dCdt(i,25)) + ...
-%         K(1,i)*theta4(1) + K(2,i)*theta4(2) + K(3,i)*theta4(3) + ...
-%         K(4,i)*theta4(4) + K(5,i)*theta4(5) + K(6,i)*theta4(6) + ...
-%         K(7,i)*theta4(7) + K(8,i)*theta4(8); % Anoxic balance
-%     Conc(i,26) = 1/Vol9*(Q(25)*dCdt(i,25) - Q(6)*dCdt(i,26)) + ...
-%         K(1,i)*theta5(1) + K(2,i)*theta5(2) + K(3,i)*theta5(3) + ...
-%         K(4,i)*theta5(4) + K(5,i)*theta5(5) + K(6,i)*theta5(6) + ...
-%         K(7,i)*theta5(7) + K(8,i)*theta5(8); % Aeration general balance
-%     if i == 8
+    for innRec = 1:50
+    %% Anox/Aer
+    if innRec == 1
+    GC28(i,1) = dCdt(i,28);
+    GC32(i,1) = dCdt(i,32);
+    else
+    end
+    % mixing point
+    dCdt(i,24) = (Q(22)*dCdt(i,22) + Q(28)*GC28(i,innRec) + ...
+        Q(32)*GC32(i,innRec))/Q(24); 
+
+    Conc(i,25) = 1/Vol8*(Q(24)*dCdt(i,24) - Q(25)*dCdt(i,25)) + ...
+        K(1,i)*theta4(1) + K(2,i)*theta4(2) + K(3,i)*theta4(3) + ...
+        K(4,i)*theta4(4) + K(5,i)*theta4(5) + K(6,i)*theta4(6) + ...
+        K(7,i)*theta4(7) + K(8,i)*theta4(8); % Anoxic balance
+    Conc(i,26) = 1/Vol9*(Q(25)*dCdt(i,25) - Q(26)*dCdt(i,26)) + ...
+        K(1,i)*theta5(1) + K(2,i)*theta5(2) + K(3,i)*theta5(3) + ...
+        K(4,i)*theta5(4) + K(5,i)*theta5(5) + K(6,i)*theta5(6) + ...
+        K(7,i)*theta5(7) + K(8,i)*theta5(8); % Aeration general balance
+    if i == 8
 % Need to setup a separate KLa variable for ST and NT
-%         if t == 1
-%         KLa = Var.param(20); % Oxygen transfer coefficient
-%         else
-%         end
-%         % Effect of aeration on the Oxygen concentration
-%         Conc(8,26) = Conc(8,26) + KLa*(So_sat - dCdt(8,26)); 
-%     else 
-%         Conc(i,26) = Conc(i,26);
-%     end 
+        if t == 1
+        KLaST = Var.param(20); % Oxygen transfer coefficient
+        else
+        end
+        % Effect of aeration on the Oxygen concentration
+        Conc(8,26) = Conc(8,26) + KLaST*(So_sat - dCdt(8,26)); 
+    else 
+        Conc(i,26) = Conc(i,26);
+    end 
 
-%     %% Recycle split, same concentration
-% 
-%     dCdt(i,28) = dCdt(i,26);
-%     dCdt(i,27) = dCdt(i,26);
+    %% Recycle split, same concentration
+
+    dCdt(i,28) = dCdt(i,26);
+    dCdt(i,27) = dCdt(i,26);
  
     % Secondary clarifier
-    %b_x = 0.0012354;
-%     if i < 3
-%         dCdt(i,29) = dCdt(i,27);
-%     elseif (2 < i) && (i < 8)
-%         dCdt(i,29) = b_x*dCdt(i,27)*Q(27)/Q(29);
-%     elseif (7 < i) && (i < 12)
-%         dCdt(i,29) = dCdt(i,27);
-%     elseif (11 < i) && (i < 13)
-%         dCdt(i,29) = b_x*dCdt(i,27)*Q(27)/Q(29);
-%     else
-%         dCdt(i,29) = dCdt(i,27);
-%     end
-%     if i < 3
-%         dCdt(i,30) = dCdt(i,27);
-%     elseif (2 < i) && (i < 8)
-%         dCdt(i,30) = (1 - b_x)*dCdt(i,27)*Q(27)/Q(30);
-%     elseif (7 < i) && (i < 12)
-%         dCdt(i,30) = dCdt(i,27);
-%     elseif (11 < i) && (i < 13)
-%         dCdt(i,30) = (1 - b_x)*dCdt(i,27)*Q(27)/Q(30);
-%     else
-%         dCdt(i,30) = dCdt(i,27);
-%     end
-%     % Mass balance for flow into/out of Primary Clarifier
-%     dCdt(i,27) = (dCdt(i,29)*Q(29) + dCdt(i,30)*Q(30))/Q(27); 
+    b_x = 0.0012354; % Fraction of TSS left in effluent, taken as average 
+    % of TSS in lbs removed from ST from Appendix B GPS-X files from B&V
+    
+    if i < 3
+        dCdt(i,29) = dCdt(i,27);
+    elseif (2 < i) && (i < 8)
+        dCdt(i,29) = b_x*dCdt(i,27)*Q(27)/Q(29);
+    elseif (7 < i) && (i < 12)
+        dCdt(i,29) = dCdt(i,27);
+    elseif (11 < i) && (i < 13)
+        dCdt(i,29) = b_x*dCdt(i,27)*Q(27)/Q(29);
+    else
+        dCdt(i,29) = dCdt(i,27);
+    end
+    if i < 3
+        dCdt(i,30) = dCdt(i,27);
+    elseif (2 < i) && (i < 8)
+        dCdt(i,30) = (1 - b_x)*dCdt(i,27)*Q(27)/Q(30);
+    elseif (7 < i) && (i < 12)
+        dCdt(i,30) = dCdt(i,27);
+    elseif (11 < i) && (i < 13)
+        dCdt(i,30) = (1 - b_x)*dCdt(i,27)*Q(27)/Q(30);
+    else
+        dCdt(i,30) = dCdt(i,27);
+    end
+    % Mass balance for flow into/out of Primary Clarifier
+    dCdt(i,27) = (dCdt(i,29)*Q(29) + dCdt(i,30)*Q(30))/Q(27); 
 
-%     %% Waste split
-%     dCdt(i,31) = dCdt(i,30);
-%     dCdt(i,32) = dCdt(i,30);
+    %% Waste split
+    dCdt(i,31) = dCdt(i,30);
+    dCdt(i,32) = dCdt(i,30);
+
+    %% Convergence solver
+    if dCdt(i,28) <= 0 
+        GC28(i,innRec) = 0;
+        err1ST = 0;
+    else
+        err1ST = 100.*((GC28(i,innRec) - dCdt(i,28))./dCdt(i,28));
+    end
+    if dCdt(i,32) <= 0
+        GC32(i,innRec) = 0;
+        err2ST = 0;
+    else
+        err2ST = 100.*((GC32(i,innRec) - dCdt(i,32))./dCdt(i,32));
+    end
+    
+    errTST = abs(err1ST) + abs(err2ST);
+    tol = 0.01;
+    if errTST > tol
+        if err1ST > 0
+            q1 = 0.5;
+            GC28(i,innRec + 1) = q1.*GC28(i,innRec) + (1 - q1)*dCdt(i,28);
+        else
+            q1 = -0.25;
+            GC28(i,innRec + 1) = q1.*GC28(i,innRec) + (1 - q1)*dCdt(i,28);
+        end
+        if err2ST > 0
+            q2 = 0.5;
+            GC32(i,innRec + 1) = q2.*GC32(i,innRec) + (1 - q2)*dCdt(i,32);
+        else
+            q2 = -0.25;
+            GC32(i,innRec + 1) = q2.*GC32(i,innRec) + (1 - q2)*dCdt(i,32);
+        end
+    else
+        break
+    end
+    end
+    if innRec > 50
+        disp('Convergence failure')
+        return
+    end
+
 % End of MLE convergence, need to encapsalate it into another convergence
 % for flow rates/concentration of centrate
-    
+    %% Calculate MCRT south train
+    % Particulate COD in aeration tank, grams
+    TSSas = (dCdt(3,26) + dCdt(4,26) + dCdt(5,26) + dCdt(6,26) + dCdt(7,26))*Vol9;
+    % Particulate COD in WAS, g/m3
+    TSSsc = (dCdt(3,31) + dCdt(4,31) + dCdt(5,31) + dCdt(6,31) + dCdt(7,31)); 
+    SLw = TSSsc*Q(31);
+    MCRT_ST = (TSSas)/(SLw);
 
     %% ST done, combine both trains before thickener
     
     %% Waste sludge mixing
-    dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3))/Q(13); % + Q(23) + Q(31)
+    Q(13) = Q(3) + Q(11) + Q(23) + Q(31); % Combines both WAS and PC sludge from both trains
+    dCdt(i,13) = (dCdt(i,11)*Q(11) + dCdt(i,3)*Q(3) + dCdt(i,23)*Q(23) + dCdt(i,31)*Q(31))/Q(13); 
     
     %% Denit Filter
     % External carbon source
     MethC = 1185000; % COD content of methanol g/m3
     ExtC = [0 MethC 0 0 0 0 0 0 0 0 0 0 0];
-    QextC = 165;%2; % Flow rate of methanol m3/day
-    Q(18) = Q(9) + QextC;
-    dCdt(i,18) = (Q(9)*dCdt(i,9) + QextC*ExtC(i))/Q(18); % + Q(29)
+    QextC = 165; % Flow rate of methanol m3/day
+    Q(18) = Q(9) + QextC + Q(29); % Adding the two process train flow rates plus the external carbon source
+    dCdt(i,18) = (Q(9)*dCdt(i,9) + QextC*ExtC(i) + dCdt(i,29)*Q(29))/Q(18); 
     
-    Conc(i,18) = 1/Vol5*(Q(9)*dCdt(i,9) - Q(18)*dCdt(i,18)) + ...
+    Conc(i,18) = 1/Vol5*((Q(9)*dCdt(i,9)+ QextC*ExtC(i) + dCdt(i,29)*Q(29)) - Q(18)*dCdt(i,18)) + ...
         K(1,i)*theta3(1) + K(2,i)*theta3(2) + K(3,i)*theta3(3) + ...
         K(4,i)*theta3(4) + K(5,i)*theta3(5) + K(6,i)*theta3(6) + ...
         K(7,i)*theta3(7) + K(8,i)*theta3(8);
@@ -627,7 +694,7 @@ while i < (CompASM + 1)
             end
     else
     end
-%     % Verify
+%     If you want to check TSS concentration vs flow rate...
 %     yyaxis left
 %     plot(Array.tArray,Array.Qarray(:,15));
 %     yyaxis right
@@ -1101,7 +1168,7 @@ while i < (CompASM + 1)
     % Variable change to check against AD paper
     %l.V_gas = 19.98697; % m3 headspace volume taken from B&V study
     %l.V_liq = Vol6 - l.V_gas; % m3
-    
+
 %% AD differential equations
 % Data/Equations pulled from Aspects on ADM1 implementation within the BSM2 framework
     % Intial conditions inside reactor
@@ -1553,12 +1620,12 @@ while i < (CompASM + 1)
     % else
     % end
     % set_cakeWT = 11793402;
-    % Q(34) = cakeFr*Q(17); % Cake
+    % Q(33) = cakeFr*Q(17); % Cake
     % concT = 0;
     % for conLen = 1:compASM
-    %   concT = concT + dCdt(conLen,34);
+    %   concT = concT + dCdt(conLen,33);
     % end
-    % CakeWT = concT*Q(34);
+    % CakeWT = concT*Q(33);
     % cakeFr = (set_CakeWT/concT)/Q(17);
     % if cakeFr > 1
     %   disp('Error: cake weight requirement too low')
@@ -1566,31 +1633,31 @@ while i < (CompASM + 1)
     %   disp('Error: cake weight requirement too heigh')
     % else
     % end
-    % Q(35) = Q(17) - Q(34); % Centrate
+    % Q(34) = Q(17) - Q(33); % Centrate
 %     
 %     if i < 3
-%         dCdt(i,35) = dCdt(i,17);
+%         dCdt(i,34) = dCdt(i,17);
 %     elseif (2 < i) && (i < 8)
-%         dCdt(i,35) = d_x*dCdt(i,17)*Q(17)/Q(35);
+%         dCdt(i,34) = d_x*dCdt(i,17)*Q(17)/Q(34);
 %     elseif (7 < i) && (i < 12)
-%         dCdt(i,35) = dCdt(i,17); 
+%         dCdt(i,34) = dCdt(i,17); 
 %     elseif (11 < i) && (i < 13)
-%         dCdt(i,35) = d_x*dCdt(i,17)*Q(17)/Q(35);
+%         dCdt(i,34) = d_x*dCdt(i,17)*Q(17)/Q(34);
 %     else
-%         dCdt(i,35) = dCdt(i,17);
+%         dCdt(i,34) = dCdt(i,17);
 %     end
 %     if i < 3
-%         dCdt(i,34) = dCdt(i,17);
+%         dCdt(i,33) = dCdt(i,17);
 %     elseif (2 < i) && (i < 8)
-%         dCdt(i,34) = (1 - d_x)*dCdt(i,17)*Q(17)/Q(34);
+%         dCdt(i,33) = (1 - d_x)*dCdt(i,13)*Q(17)/Q(33);
 %     elseif (7 < i) && (i < 12)
-%         dCdt(i,34) = dCdt(i,17);
+%         dCdt(i,33) = dCdt(i,17);
 %     elseif (11 < i) && (i < 17)
-%         dCdt(i,34) = (1 - d_x)*dCdt(i,17)*Q(17)/Q(34);
+%         dCdt(i,33) = (1 - d_x)*dCdt(i,17)*Q(17)/Q(33);
 %     else
-%         dCdt(i,34) = dCdt(i,13);
+%         dCdt(i,33) = dCdt(i,13);
 %     end
-%     dCdt(i,17) = (dCdt(i,34)*Q(34) + dCdt(i,35)*Q(35))/Q(17);
+%     dCdt(i,17) = (dCdt(i,34)*Q(34) + dCdt(i,33)*Q(33))/Q(17);
 %% Need convergence solver on the centrate line from dewatering
     
     i = i + 1;
@@ -1608,7 +1675,8 @@ if t == 1
     Array.ft = ft;
     Array.pH = pH;
     Array.QgasAlt = q_gasAlt;
-    Array.SRT = MCRT;
+    Array.SRT_NT = MCRT_NT;
+    Array.SRT_ST = MCRT_ST;
 elseif t >= 1.01
     % Avoid large dataset and quicken solver time by only aquiring data at the specified time span
 %     findT = ismembertol(t,Var.timespan,0.00001);
@@ -1623,7 +1691,8 @@ elseif t >= 1.01
         Array.ft = [Array.ft;ft];
         Array.pH = [Array.pH;pH];
         Array.QgasAlt = [Array.QgasAlt;q_gasAlt];
-        Array.SRT = [Array.SRT;MCRT];
+        Array.SRT_NT = [Array.SRT_NT;MCRT_NT];
+        Array.SRT_ST = [Array.SRT_ST;MCRT_ST];
         assignin('base','Array',Array);
     else
     end
