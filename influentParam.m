@@ -8,12 +8,12 @@
 % previous start-up run. The steady state values can be checked by running a
 % start-up simulation and checking/changing the values of each stream with
 % the initialvaluesAll.m file.
-% Start-up should be chosen as a first choice.
+% Start-up should be chosen as a first choice, then adjusted.
 
 
 function [Var,x] =  influentParam()
 % Parameters correspond to those of ASM1, at 20 degree C
-% Values taken from GPS-X
+% Values taken from GPS-X, (B&V)
 % Except for ng and nh -> Taken from book: ACTIVATED SLUDGE MODELS
 % ASM1, ASM2, ASM2d AND ASM3
 Var.param = [0.666 ... % Yh [gCOD/gCOD]
@@ -49,6 +49,10 @@ Var.param = [0.666 ... % Yh [gCOD/gCOD]
     19215.3873]'; % ST SC, m3
 
 %% Recycle ratios for MLE system
+% It should be noted that although the WAS is a control variable, with a
+% value of 160 gpm, it can't be specified if the RAS recycle ratio is
+% already specified, which is the case. Even though this is the case, the
+% WAS should be very close to that value.
 % North Train
 Var.RirNT = 1.85; % Specify internal recycle ratio MLR/PC_influent, calculated from flow data average [Flow_June2018_2019.xlsx]
 Var.RrNT = 0.70; % Specify return activated sludge recycle ratio RAS/PC_influent , calculated from flow data average [Flow_June2018_2019.xlsx]
@@ -58,13 +62,17 @@ Var.RirST = 1.97; % Specify internal recycle ratio MLR/PC_influent, calculated f
 Var.RrST = 0.69; % Specify return activated sludge recycle ratio RAS/PC_influent, calculated from flow data average  [Flow_June2018_2019.xlsx]
 Var.fscST = 0.947867; % Secondary Clarifier underflow separation (has to be less than or equal to 1) (taken from B&V results)
 
-Var.ft = 0.1976; % Flow fraction of concentrated TSS stream with respect to inflow, set fraction, is dynamically changed inside ODE function
+Var.ft = 0.1976; % Flow fraction of concentrated TSS stream with respect to inflow. It is just a set fraction, the value is dynamically changed inside ODE function
 
 % "start up"
 [sys_int,Var1] = InflChar; % Pull influent characteristics from file
 Var = catstruct(Var,Var1); % Combine two structures using castruct: https://www.mathworks.com/matlabcentral/fileexchange/7842-catstruct
-x = sys_int(:)*ones(1,32); % Format to an array of [components,streams]
+x = sys_int(:)*ones(1,34); % Format to an array of [components,streams]
+
 % "steady state"
+% **Can't run steady state yet, more streams need to be added
+% to the file, and the new steady state values need to be implemented**
+
 % Uncomment line below, and comment out the two above for "steady state"
 %x = initialValuesAll(sys_int);
 end

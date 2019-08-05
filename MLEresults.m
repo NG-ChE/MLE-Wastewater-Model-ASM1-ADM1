@@ -1,4 +1,4 @@
-%% This file pulls data form IndataADM1_v2.m
+%% This file pulls data from IndataADM1_v2.m
 % The purpose of this file is to take the ODE results and plot certain
 % streams, as well as do a carbon mass balance.
 
@@ -40,7 +40,7 @@ time = Array.tArray;
 %% Plotting separate results
 %% MLE + AD Results
 % Create ASM Plant Stream Structure (Based on ASM1 Variables)
-% Stream 14 is excluded as it is only a gas stream of 3 AD Components
+% Stream 16 is excluded as it is only a gas stream of 3 AD Components
 % North Train
 ASMstream.One = reshape(Concentration(:,1),[compASM,length(time)])';
 ASMstream.Two = reshape(Concentration(:,2),[compASM,length(time)])';
@@ -262,26 +262,26 @@ ylabel('Partial Pressure')
 xlabel('Time, days')
 legend('CH4','CO2','H2')
 
-%% Carbon (grams) in system
+%% Carbon in system
 % Carbon content fractions
-% Fractions taken from B&V study
-CF.C_S_I = 0.32; % C content of soluble inert material (Si) [gC/gCOD]
-CF.C_I_P = 0.32; % C content of inert particulate material (Xi) [gC/gCOD]
-CF.C_SB_S = 0.32; % C content of slowly biodegradable substrate (Xs) [gC/gCOD]
-CF.C_S_S = 0.32; % C content of soluble substrate (Ss) [gC/gCOD]
+% Fractions taken from B&V study results
+CF.C_S_I = 0.32; % C content of soluble inert material **(Si)** [gC/gCOD]
+CF.C_I_P = 0.32; % C content of inert particulate material **(Xi)** [gC/gCOD]
+CF.C_SB_S = 0.32; % C content of slowly biodegradable substrate **(Xs)** [gC/gCOD]
+CF.C_S_S = 0.32; % C content of soluble substrate **(Ss)** [gC/gCOD]
 CF.C_C = 0.32; % C content of colloidal material [gC/gCOD]
 CF.C_A = 0.375; % C content of acetate [gC/gCOD]
 CF.C_P = 0.321; % C content of propionate [gC/gCOD]
 CF.C_M = 0.25; % C content of methanol [gC/gCOD]
 CF.C_S_M = 0.188; % C content of soluble methane [gC/gCOD]
 CF.C_CO2 =  0.273; % C content of carbon dioxide [gC/gCO2]
-CF.C_CC = 0.12; % C content of calcium carbonate (Salk) [gC/gCaCO3]
-CF.C_HB = 0.366; % C content of heterotrophic biomass (Xbh) [gC/gCOD]
+CF.C_CC = 0.12; % C content of calcium carbonate **(Salk)** [gC/gCaCO3]
+CF.C_HB = 0.366; % C content of heterotrophic biomass **(Xbh)** [gC/gCOD]
 CF.C_AOB = 0.366; % C content of ammonia-oxidizing biomass [gC/gCOD]
 CF.C_NOB = 0.366; % C content of nitrite-oxidizing biomass [gC/gCOD]
 % AOB/NOB are autotrophic biomass
-CF.C_AB = 0.366; % C content of autotrophic biomass (Xba) [gC/gCOD]
-CF.C_UB = 0.366; % C content of unbiodegradable residue (Xp) [gC/gCOD]
+CF.C_AB = 0.366; % C content of autotrophic biomass **(Xba)** [gC/gCOD]
+CF.C_UB = 0.366; % C content of unbiodegradable residue **(Xp)** [gC/gCOD]
 
 % Create arrays for carbon
 % Each carbon component relates to a component in the ASM1 Concentration
@@ -307,7 +307,6 @@ while p < (length(time) + 1)
     Carbon.CAB = [Carbon.CAB;Concentration(loop.CAB,:)];
     Carbon.CUB = [Carbon.CUB;Concentration(loop.CUB,:)];
     Carbon.CCC = [Carbon.CCC;Concentration(loop.CCC,:)];
-    % Adjusted to only col 2, was all col before
     Carbon.CSM = [Carbon.CSM;Conc_AD(loop.CSM,2)];
     Carbon.CCO2 = [Carbon.CCO2;Conc_AD(loop.CCO2,2)];
     loop.CSI = loop.CCC + 1;
@@ -323,8 +322,6 @@ while p < (length(time) + 1)
     p = p + 1;
 end 
 % Convert concentration to mass/time
-% Removed extra CSI array, and changed everything besides CSI/CSM/CCO2 to
-% their correct structure name (was all CSI)
 Carbon.CSIgrams = Carbon.CSI.*Array.Qarray;
 Carbon.CSSgrams = Carbon.CSS.*Array.Qarray;
 Carbon.CIPgrams = Carbon.CIP.*Array.Qarray;
@@ -338,7 +335,6 @@ Carbon.CCO2moleC = Carbon.CCO2.*ADMstream.q_gas.*1000; % Convert to mol
 
 % Determine total carbon mass flow rate [gC/day] in stream m
 % Multiply carbon fraction by the corresponding carbon component
-% Methanol still needs to be implemented
 m = 1;
 Cflow = ones(length(time),col); % Preallocate array
 while m < (col + 1)
@@ -353,35 +349,13 @@ QextC = 165;%2; % Flow rate of methanol m3/day
 Cflow(:,21) = MethC*QextC*CF.C_S_S;
 % Adjust for gas stream
 % Convert from COD to grams and mol to grams
-Cflow(:,16) = Carbon.CSMgram.*CF.C_S_M + Carbon.CCO2moleC.*12.01; 
+MW_C = 12.01; % Molecular weight of carbon
+Cflow(:,16) = Carbon.CSMgram.*CF.C_S_M + Carbon.CCO2moleC.*MW_C; 
 % Convert grams to lbs 
 Cflow = 0.00220462.*Cflow;
-% IGNORE MASS BALANCE CHECK
-    % Dynamic system
-% Mass balance check
-PerError = [];
-PerError(:,1) = 100.*(Cflow(:,1) - (Cflow(:,2) + Cflow(:,3)))./Cflow(:,1);
-PerError(:,2) = 100.*(Cflow(:,4) - (Cflow(:,12) + Cflow(:,8)+ Cflow(:,2)))./Cflow(:,4);
-PerError(:,3) = 100.*(Cflow(:,4) - Cflow(:,5))./Cflow(:,4);
-PerError(:,4) = 100.*(Cflow(:,5) - Cflow(:,6))./Cflow(:,5);
-PerError(:,5) = 100.*(Cflow(:,6) - (Cflow(:,8) + Cflow(:,7)))./Cflow(:,6);
-PerError(:,6) = 100.*(Cflow(:,7) - (Cflow(:,9) + Cflow(:,10)))./Cflow(:,7);
-PerError(:,7) = 100.*(Cflow(:,10) - (Cflow(:,12) + Cflow(:,11)))./Cflow(:,10);
-PerError(:,8) = 100.*((Cflow(:,1) + Cflow(:,21)) - (Cflow(:,16) + Cflow(:,17) + Cflow(:,19) + Cflow(:,20) + Cflow(:,14)))./(Cflow(:,1) + Cflow(:,21)) ;
-PerError(:,9) = 100.*(Cflow(:,13) - (Cflow(:,11) + Cflow(:,3) + Cflow(23) + Cflow(31)))./Cflow(:,13);
-PerError(:,10) = 100.*(Cflow(:,13) - Cflow(:,15) - Cflow(:,14))./Cflow(:,13);
-PerError(:,11) = 100.*(Cflow(:,15) - Cflow(:,17) - Cflow(:,16))./Cflow(:,15);
-PerError(:,12) = 100.*((Cflow(:,9) + Cflow(:,21) + Cflow(29)) - Cflow(:,18))./((Cflow(:,9) + Cflow(:,21)));
-PerError(:,13) = 100.*(Cflow(:,18) - Cflow(:,19) - Cflow(:,20))./Cflow(:,18);
-% Plot percent error
-figure(4)
-plot(time,PerError)
-title('Mass Balance Percent Error')
-ylabel('Error, %')
-xlabel('Time, days')
 
 % Plot carbon flow for each stream separately
-figure(5)
+figure(4)
 subplot(4,4,1)
 plot(time,Cflow(:,1))
 title('Plant Influent')
@@ -464,7 +438,7 @@ ylabel('Carbon Flow, lb/day')
 xlabel('Time, days')
 
 %% Plant Effluent
-figure(6)
+figure(5)
 subplot(2,2,1)
 plot(time,ASMstream.Nineteen(:,10))
 title('Plant Effluent Ammonia')
@@ -489,11 +463,16 @@ xlabel('Time, days')
 yyaxis right
 plot(time,Array.Qarray(:,15));
 
-figure(7) %% Random plots
+figure(6) %% Random plots
 subplot(4,3,1)
+title('MCRT NT and ST')
+yyaxis left
 plot(time,Array.SRT_NT)
-title('MCRT NT')
-ylabel('MCRT, days')
+ylabel('MCRT NT, days')
+xlabel('Time, days')
+yyaxis right
+plot(time,Array.SRT_ST)
+ylabel('MCRT ST, days')
 xlabel('Time, days')
 subplot(4,3,2)
 plot(time,ASMstream.Thirteen)

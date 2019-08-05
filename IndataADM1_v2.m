@@ -1,5 +1,7 @@
 %% File compiled from "Modeling and simulation of anaerobic
-% manure digestion into biogas" by OSKAR DANIELSSON
+% manure digestion into biogas" by OSKAR DANIELSSON, with some changes of
+% my own for certain volumes/parameters
+% source: http://publications.lib.chalmers.se/records/fulltext/211706/211706.pdf
 % File is for writing indata to ODE implementation of ADM1. The file saves all
 % valuable information in the struct *l*, which later can be used through
 % the rest of the implementation.
@@ -117,7 +119,7 @@ l.K_a_lac = 10^-3.86;
 %Parameter Value Unit
 %...........................................
 l.V_gas = 19.98697; %m^3
-l.V_liq = 6056.65888 - l.V_gas; %m^3
+l.V_liq = 6056.65888 - l.V_gas; %m^3 % Digester volume of 1.6 MGD - headspace of 5200 gal
 %...........................................
 %==========================================================================
 %Biochemical parameter values Comment
@@ -230,3 +232,4 @@ l.X_lac_f_in= 0;%0.01; %kg COD m^-3 37
 l.X_lac_o_in= 0;%0.01; %kg COD m^-3 38
 %.................................................
 l.S_ca_in = 0;%0.01; %kg CaCO3 m^-3 39
+end

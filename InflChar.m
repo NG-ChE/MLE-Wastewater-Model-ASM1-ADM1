@@ -13,28 +13,28 @@ sumData = [];
 % Alkalinity set to 316 mg/L of calcium carbonate
 % Value received from Albert 
 fixData = sumData;
-fixData(:,7) = 316*2; % Changed to high alkalinity for now -> due to VERY high increase of nitrate/nitrite in aeration basin
+fixData(:,7) = 316*2; % Changed to high alkalinity for now, otherwise ODE stops, -> due to VERY high increase of nitrate/nitrite in aeration basin
+% Fill in missing data points with a moving media of 100 points
 InfluentData = fillmissing(fixData,'movmedian',100); 
 
 %% Convert typical units coming into plant to ASM1 variables
 % Concentration for each component taken as an average for initial
-% condition of influent, however, it gets overwritten in ODE
+% condition of influent, however, influent gets overwritten in ODE
 % Units g/m3 = mg/L
-infChar.TSS = InfluentData(:,2); % mg/L
+infChar.TSS = InfluentData(:,2); % mg/L, total suspended solids
 % If no VSS data, assume VSS/TSS ratio of 0.69 or 0.75
 infChar.tvRatio = 0.69;
-infChar.VSS = infChar.TSS.*infChar.tvRatio;
-infChar.FSS = infChar.TSS - infChar.VSS; % fixed suspended solids
-% USING CBOD FROM DATA
+infChar.VSS = infChar.TSS.*infChar.tvRatio; % mg/L, volatile SS
+infChar.FSS = infChar.TSS - infChar.VSS; % mg/L, fixed SS
 infChar.cBOD = InfluentData(:,3); % mg/L
 infChar.TKN = InfluentData(:,4); % mg-N/L
 infChar.NH3 = InfluentData(:,5); % mg-N/L
 infChar.NO3 = InfluentData(:,6); % mg-N/L
-infChar.BOD = infChar.cBOD;
-% Alkalinity not given, will have Thursday from Albert
+infChar.BOD = infChar.cBOD; % mg/L
 infChar.ALK = InfluentData(:,7); % mg/L
-% % Conversion to ASM1 variables using Biological Wastewater Treatment by
-% % Grady, Daigger, Love and Filipe, from Chapter 9.6
+% Conversion to ASM1 variables using Biological Wastewater Treatment by
+% Grady, Daigger, Love and Filipe, from Chapter 9.6, for CODt and CODbo
+% constant values
 infChar.CODt = 2.1.*infChar.BOD; % mgCOD/L, Converts BOD5 to total COD, if not available
 infChar.CODbo = 1.71.*infChar.BOD; % mgCOD/L, biodegradable COD
 infChar.CODio = infChar.CODt - infChar.CODbo; % mgCOD/L, inert COD
@@ -48,7 +48,7 @@ infChar.CODio = infChar.CODt - infChar.CODbo; % mgCOD/L, inert COD
 frsi = 0.11; % Soluble inert fraction of total COD
 frss = 0.1; % Readily biodegradable fraction of total COD
 frxi = 0.09; % Particulate inert fraction of total COD
-% It should be noted that frxi is very low when compared to other
+% It should be noted that frxi fraction is very low when compared to other
 % wastewater characterstic studies
 frsnh = 0.9; % Ammonium fraction of soluble TKN 
 insi = 0.05; % N content of soluble inert material, gN/gCOD
@@ -58,16 +58,16 @@ ASM.Sio = frsi.*infChar.CODt; % mgCOD/L, soluble inert COD
 ASM.Sso = frss.*infChar.CODt;  % mgCOD/L, readily biodegradable substrate
 ASM.Xio = frxi.*infChar.CODt; % mgCOD/L, particulate inert COD
 ASM.Xso = (1 - frsi - frss - frxi).*infChar.CODt; % mgCOD/L, slowly biodegradable substrate
-ASM.Xbho = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, heterotrophic active biomass -> cant be zero, but very close to it
-ASM.Xbao = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, autrophic active biomass -> cant be zero, but very close to it
+ASM.Xbho = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, heterotrophic active biomass -> cant be zero, due to ODE, but very close to it
+ASM.Xbao = repelem(0.000000001,length(InfluentData))'; % mgCOD/L, autrophic active biomass -> cant be zero, due to ODE, but very close to it
 ASM.Soo = repelem(0,length(InfluentData))'; % mgO2/L, oxygen concentration
 ASM.Xpo = repelem(0,length(InfluentData))'; % mgCOD/L, biomass debris 
 ASM.Salko = infChar.ALK./100; % mol/L, alkalinity
-ASM.Snho = infChar.NH3; % Initial ammonia
-ASM.Snoo = infChar.NO3; % Initial nitrite/nitrate
+ASM.Snho = infChar.NH3; % mgN/L, Initial ammonia
+ASM.Snoo = infChar.NO3; % mgN/L, Initial nitrite/nitrate
 stkn = (ASM.Snho)./frsnh; % Filtered TKN
-ASM.Sndo = stkn - ASM.Snho - insi.*ASM.Sio; % Soluble organic Nitrogen
-ASM.Xndo = infChar.TKN - stkn - inxi.*ASM.Xio;
+ASM.Sndo = stkn - ASM.Snho - insi.*ASM.Sio; % mgN/L, Soluble organic Nitrogen
+ASM.Xndo = infChar.TKN - stkn - inxi.*ASM.Xio; % mgN/L, Particulate biodegradable organic nitrogen
 % If any are less than zero
 ASM.Sndo(ASM.Sndo<0) = 0.000000001;
 ASM.Xndo(ASM.Xndo<0) = 0.000000001;
@@ -75,7 +75,9 @@ ASM.Xndo(ASM.Xndo<0) = 0.000000001;
 %% Intial conditions for system
 MLE_influent = [ASM.Sio ASM.Sso ASM.Xio ASM.Xso ASM.Xbho ASM.Xbao ASM.Xpo ...
     ASM.Soo ASM.Snoo ASM.Snho ASM.Sndo ASM.Xndo ASM.Salko];
-MLE_int = mean(MLE_influent); % Create vector of initial values for the MLE system based on total average
+MLE_int = mean(MLE_influent); % Average of the data set
+% Create vector of initial values for the MLE system based on total average
+% Initial values taken from Aspects on ADM1 Implementation within the BSM2 Framework
 AD_int = [0.009;... % S_su
 0.0009;...          % S_aa
 0.0009;...          % S_fa 
