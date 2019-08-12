@@ -1,4 +1,4 @@
-%% File compiled from "Modeling and simulation of anaerobic
+% File compiled from "Modeling and simulation of anaerobic
 % manure digestion into biogas" by OSKAR DANIELSSON, with some changes of
 % my own for certain volumes/parameters
 % source: http://publications.lib.chalmers.se/records/fulltext/211706/211706.pdf

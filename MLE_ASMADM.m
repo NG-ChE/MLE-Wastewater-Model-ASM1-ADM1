@@ -1,10 +1,6 @@
 tic
 %% TO-DO
 
-% Get new steady state results for initialvaluesAll.m
-    % Around day 30 is when the system starts to achieve a puesdo-steady state
-% Deal with high oxygen conc.
-
 % Implement FOG for AD
     % No chemical characeristics given, not sure what to do or if even
     % implement
@@ -20,11 +16,14 @@ tic
 % Create GUI for kinetics/ recycle ratios/ simulation time/ flow variables
 
 %% Issues
+% High nitrate levels in effluent
+    % Alkalinity had to be adjusted (twice that of the original)
+    % otherwise the ODE solver would stop as the alkalinity would reach 0
+    % Change value in InflChar.m
 % Denitrification filter not doing anything
     % High O2 concentration undoubtably the cause
     % O2 controller should resolve this issue
-    
-% ***** CHECK UNITS *****
+
 
 clc
 
@@ -32,22 +31,24 @@ clc
 [Var,x] = influentParam(); 
 
 %% Pull AD parameters from file
-% ADJUST VALUES TO PLANT SPECIFIC DIMENSIONS
 l = IndataADM1_v2;
 
 %% Simulation time span (days)
-% Decrease time_span, for more data points in result section, can
+% Decrease time_span for more data points in result section, can
 % signicantly increase time if interval is very small
 time_span = 0.1;
+% Uncomment to run simulation for all days from excel file
 %t = 1:time_span:fixData(end,1);
+
 t = 1:time_span:75;
+
 % Sample rate for certain variables in ODE
 sp = 1/5;
 Var.tsample = t + sp*t;
 Var.timespan = t;
 
 %% ODE
-% Calls the MLE function
+% Calls the MLE function file
 odefunc = @(t,x) MLE(t,x,Var,l);
 opts = odeset('MStateDependence','JPattern');
 ODE_sol = ode15s(odefunc,t,x,opts);
@@ -60,10 +61,10 @@ ODEToc = toc;
 function [Conc] = MLE(t,dCdt,Var,l)
 persistent Array
 persistent ft
-% persistent preverrDO_NT
-% persistent prevt_NT
-% persistent preverrDO_ST
-% persistent prevt_ST
+persistent preverrDO_NT
+persistent prevt_NT
+persistent preverrDO_ST
+persistent prevt_ST
 CompASM = 13;
 
 %% Dynamic flow
@@ -72,9 +73,9 @@ Q_NT = interp1(Var.Qt,Var.QflowNT,t); % North train flow, m3/day
 Q_ST = interp1(Var.Qt,Var.QflowST,t); % South train flow, m3/day
 
 %% Average flows for steady state simulation
-% Comment out previous variables for this case
-% Q_NT = 57622.45; % m3/day
-% Q_ST = 35982.00; % m3/day
+% Comment out previous variables, and uncomment the two lines below, for this case
+%Q_NT = 57622.45; % m3/day
+%Q_ST = 35982.00; % m3/day
 %% Solve flow balance
 if t == 1
 ft = Var.ft;
@@ -376,38 +377,41 @@ while i < (CompASM + 1)
     Conc(i,6) = 1/Vol3*(Q(5)*dCdt(i,5) - Q(6)*dCdt(i,6)) + r_aer; % Aeration general balance
     if i == 8
         % DO control, needs to be adjusted
-%         set_DO = 2; % g/m3
-%         errDO_NT = set_DO - dCdt(8,6);
-%         mbias = 50; % percent of total Kla
-%         % Controller gains
-%         Kc = 1.1; Ki = 2.5; Kd = 6.25;
-%         if t == 1
-%           prevt_NT = 0.9999999999;
-%           preverrDO_NT = 0;
-%         else
-%         end
-%         Xvec_NT = [preverrDO_NT,errDO_NT];
-%         Yvec_NT = [prevt_NT,t];
-%         controller_NT = mbias + Kc*errDO_NT+ Ki*trapz(Xvec_NT,Yvec_NT,2);%+ Kd*diff(preverrDO_NT)/diff(prevt_NT);
-%         preverrDO_NT = errDO_NT;%[preverrDO_NT,errDO_NT];
-%         prevt_NT = t;%[prevt_NT,t];
-%         % Prevent large data storage
-% %         if numel(preverrDO_NT) > 100
-% %             preverrDO_NT = preverrDO_NT(end);
-% %         else
-% %         end
-% %         if numel(prevt_NT) > 100
-% %             prevt_NT = prevt_NT(end);
-% %         else
-% %         end
-%         maxKla = 100; % Maximum mass transfer of oxygen, [1/day]
-%         if controller_NT > 100
-%             controller_NT = 100;
-%         elseif controller_NT < 0
-%             controller_NT = 0;
-%         else
-%         end
-        kla_set = 100; %controller_NT*maxKla/100; % Set KLa value from controller
+        % The set value doesnt correspond to the final result as there is
+        % some error between set point and final value
+        set_DO = 1; % g/m3, 1 is set -> 1.164 is result under steady state
+        % Error between set point and variable result
+        errDO_NT = set_DO - dCdt(8,6);
+        mbias = 50; % percent of total Kla
+        % Controller gains
+        Kc = 1.1; Ki = 2.5;
+        if t == 1
+          prevt_NT = 0.9999999999;
+          preverrDO_NT = 0;
+        else
+        end
+        Xvec_NT = [preverrDO_NT,errDO_NT];
+        Yvec_NT = [prevt_NT,t];
+        controller_NT = mbias + Kc*errDO_NT+ Ki*trapz(Xvec_NT,Yvec_NT,2); 
+        preverrDO_NT = errDO_NT; %[preverrDO_NT,errDO_NT];
+        prevt_NT = t; %[prevt_NT,t];
+        % Prevent large data storage
+        if numel(preverrDO_NT) > 100
+            preverrDO_NT = preverrDO_NT(end);
+        else
+        end
+        if numel(prevt_NT) > 100
+            prevt_NT = prevt_NT(end);
+        else
+        end
+        max_Kla = 80; % Maximum mass transfer of oxygen, [1/day]
+        if controller_NT > 100
+            controller_NT = 100;
+        elseif controller_NT < 0
+            controller_NT = 0;
+        else
+        end
+        kla_set = controller_NT*max_Kla/100; % Set KLa value from controller
         % Effect of aeration on the Oxygen concentration
         Conc(8,6) = Conc(8,6) + kla_set*(So_sat - dCdt(8,6)); 
     else 
@@ -585,40 +589,43 @@ while i < (CompASM + 1)
     Conc(i,26) = 1/Vol9*(Q(25)*dCdt(i,25) - Q(26)*dCdt(i,26)) + rAer; % Aeration general balance
     
     if i == 8
-%         setDO = 2; % g/m3
-%         % DO control
-%         errDO_ST = setDO - dCdt(8,26);
-%         mbias = 50; % percent of total Kla
-%         % Controller gains
-%         Kc = 1.1; Ki = 2.5; Kd = 6.25;
-%         if t == 1
-%           prevt_ST = 0.9999999999;
-%           preverrDO_ST = 0;
-%         else
-%         
-%         end
-%         Xvec_ST = [preverrDO_ST,errDO_ST];
-%         Yvec_ST = [prevt_ST,t];
-%         controller_ST = mbias + Kc*errDO_ST + Ki*trapz(Xvec_ST,Yvec_ST,2);%+ Kd*diff(preverrDO_ST)/diff(prevt_ST);
-%         preverrDO_ST = errDO_ST;%[preverrDO_ST,errDO_ST];
-%         prevt_ST = t;%[prevt_ST,t];
-%         % Prevent large data storage
-% %         if numel(preverrDO_ST) > 100
-% %             preverrDO_ST = preverrDO_ST(end);
-% %         else
-% %         end
-% %         if numel(prevt_ST) > 100
-% %             prevt_ST = prevt_ST(end);
-% %         else
-% %         end
-%         maxKla = 100; % Maximum mass transfer of oxygen, [1/day]
-%         if controller_ST > 100
-%             controller_ST = 100;
-%         elseif controller_ST < 0
-%             controller_ST = 0;
-%         else
-%         end
-        klaSet = 100; %controller_ST*maxKla/100; % Set KLa value from controller
+        % DO control, needs to be adjusted
+        % The set value doesnt correspond to the final result as there is
+        % some error between set point and final value
+        setDO = 0.8; % g/m3 0.8 is set -> 1.847 is result under steady state
+        % Error between set point and variable result
+        errDO_ST = setDO - dCdt(8,26);
+        mbias = 50; % percent of total Kla
+        % Controller gains
+        Kc = 1.1; Ki = 2.5;
+        if t == 1
+          prevt_ST = 0.9999999999;
+          preverrDO_ST = 0;
+        else
+        
+        end
+        Xvec_ST = [preverrDO_ST,errDO_ST];
+        Yvec_ST = [prevt_ST,t];
+        controller_ST = mbias + Kc*errDO_ST + Ki*trapz(Xvec_ST,Yvec_ST,2);
+        preverrDO_ST = errDO_ST; %[preverrDO_ST,errDO_ST];
+        prevt_ST = t; %[prevt_ST,t];
+        % Prevent large data storage
+        if numel(preverrDO_ST) > 100
+            preverrDO_ST = preverrDO_ST(end);
+        else
+        end
+        if numel(prevt_ST) > 100
+            prevt_ST = prevt_ST(end);
+        else
+        end
+        maxKla = 75; % Maximum mass transfer of oxygen, [1/day]
+        if controller_ST > 100
+            controller_ST = 100;
+        elseif controller_ST < 0
+            controller_ST = 0;
+        else
+        end
+        klaSet = controller_ST*maxKla/100; % Set KLa value from controller
         Conc(8,26) = Conc(8,26) + klaSet*(So_sat - dCdt(8,26)); 
     else 
         Conc(i,26) = Conc(i,26);

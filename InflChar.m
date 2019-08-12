@@ -10,10 +10,12 @@ sumData = [];
         [data,~] = xlsread('simuPlantData.xlsx',s);
         sumData = [sumData;data];
     end
+    
 % Alkalinity set to 316 mg/L of calcium carbonate
 % Value received from Albert 
 fixData = sumData;
-fixData(:,7) = 316*2; % Changed to high alkalinity for now, otherwise ODE stops, -> due to VERY high increase of nitrate/nitrite in aeration basin
+fixData(:,7) = 316*2; % Changed to high alkalinity for now, otherwise ODE stops, -> due to VERY high conc of nitrate/nitrite
+
 % Fill in missing data points with a moving media of 100 points
 InfluentData = fillmissing(fixData,'movmedian',100); 
 

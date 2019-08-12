@@ -77,6 +77,8 @@ ASMstream.Seventeen = reshape(Concentration(:,17),[compASM,length(time)])'; % AS
 ASMstream.Eightteen = reshape(Concentration(:,18),[compASM,length(time)])';
 ASMstream.Nineteen = reshape(Concentration(:,19),[compASM,length(time)])';
 ASMstream.Twenty = reshape(Concentration(:,20),[compASM,length(time)])';
+ASMstream.ThirtyThree = reshape(Concentration(:,33),[compASM,length(time)])';
+ASMstream.ThirtyFour = reshape(Concentration(:,34),[compASM,length(time)])';
 
 figure(1) % North train
 subplot(4,3,1)

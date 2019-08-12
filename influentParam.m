@@ -1,4 +1,4 @@
-%% This file pulls data from InflChar.m
+%% This file pulls data from InflChar.m and initialValuesAll.m
 % The Var structure is used for biological parameters,
 % recycle ratios, the influent concentration and flow,
 % as well as the initial values of the ODE.
@@ -64,15 +64,14 @@ Var.fscST = 0.947867; % Secondary Clarifier underflow separation (has to be less
 
 Var.ft = 0.1976; % Flow fraction of concentrated TSS stream with respect to inflow. It is just a set fraction, the value is dynamically changed inside ODE function
 
-% "start up"
+% "start up", initial conditions for each stream are the same, except for
+% digester streams
 [sys_int,Var1] = InflChar; % Pull influent characteristics from file
 Var = catstruct(Var,Var1); % Combine two structures using castruct: https://www.mathworks.com/matlabcentral/fileexchange/7842-catstruct
 x = sys_int(:)*ones(1,34); % Format to an array of [components,streams]
 
 % "steady state"
-% **Can't run steady state yet, more streams need to be added
-% to the file, and the new steady state values need to be implemented**
-
-% Uncomment line below, and comment out the two above for "steady state"
+% Uncomment line below, and comment out the two above for steady state
+% values as initial conditions for each stream
 %x = initialValuesAll(sys_int);
 end
